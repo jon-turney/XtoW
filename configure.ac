@@ -14,6 +14,8 @@ m4_ifndef([XORG_MACROS_VERSION],
 XORG_MACROS_VERSION(1.16)
 XORG_DEFAULT_OPTIONS
 
+CFLAGS="-std=c99 -Wall -Wextra -Wmissing-prototypes $CFLAGS"
+
 # check for programs
 AC_PROG_CC
 AC_PROG_INSTALL

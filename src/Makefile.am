@@ -4,11 +4,14 @@ bin_PROGRAMS = xtow
 
 xtow_SOURCES = \
 	main.c \
-	win.c \
+	wndproc.c \
+	wndproc.h \
+	winmessages.h \
 	debug.c \
 	debug.h \
 	winkeybd.c \
-	winmessages.h \
+	winkeybd.h \
+	winvkmap.h \
 	scancodes.h
 
 xtow_LDADD = $(XCWM_LIBS) -lgdi32

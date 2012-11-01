@@ -31,6 +31,8 @@
 
 #include "debug.h"
 #include "winmessages.h"
+#include "winkeybd.h"
+#include "wndproc.h"
 
 #define WINDOW_CLASS_X "xtow"
 #define WINDOW_TITLE_X "X"
@@ -126,7 +128,7 @@ ClientToXCoord(HWND hWnd, POINT *pt)
  * The functionality is the inverse of winPositionWindowMultiWindow, which
  * adjusts Windows window with respect to X window.
  */
-int
+static int
 winAdjustXWindow (xcwm_window_t *window, HWND hWnd)
 {
   RECT rcWin;
@@ -213,8 +215,7 @@ UpdateImage(xcwm_window_t *window)
   damage.bottom = dmgRect->y + dmgRect->height;
 
   DEBUG("UpdateImage: invalidating %dx%d @ %d,%d on HWND 0x08%x\n", dmgRect->width, dmgRect->height, damage.left, damage.top, hWnd);
-  // InvalidateRect(hWnd, &damage, TRUE);
-  InvalidateRect(hWnd, NULL, TRUE); // invalidate whole window for a test
+  InvalidateRect(hWnd, &damage, FALSE);
 }
 
 #if 0
@@ -481,7 +482,7 @@ UpdateStyle(struct client *pWin)
 #endif
 
 /* Don't allow window decoration to disappear off to top-left */
-void
+static void
 BumpWindowPosition(HWND hWnd)
 {
   WINDOWINFO wi;
@@ -530,12 +531,13 @@ winStartMousePolling(void)
 
 static bool g_fButton[3] = { FALSE, FALSE, FALSE };
 
-int
+static int
 winMouseButtonsHandle(xcwm_window_t *window, bool press, int iButton, HWND hWnd, LPARAM lParam)
 {
   /* 3 button emulation code would go here, if we thought anyone actually needed it anymore... */
 
-  g_fButton[iButton] = press;
+  g_fButton[iButton-1] = press;
+
   if (press)
     {
       SetCapture(hWnd);
@@ -593,7 +595,7 @@ winDebugWin32Message(const char* function, HWND hWnd, UINT message, WPARAM wPara
  * winTopLevelWindowProc - Window procedure for all top-level Windows windows.
  */
 
-LRESULT CALLBACK
+static LRESULT CALLBACK
 winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
   static bool hasEnteredSizeMove = FALSE;
@@ -663,6 +665,8 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     case WM_CLOSE:
       xcwm_window_request_close(window);
+      // XXX: RACE!!! window will become invalid when we get XCB_DESTROY_NOTIFY back from server
+      // but this wndproc may continue to touch it until we get WM_DESTROY..
       return 0;
 
     case WM_DESTROY:
@@ -813,23 +817,22 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             image = xcwm_image_copy_damaged(window);
             if (image)
               {
-                xcwm_rect_t *winRect = xcwm_window_get_full_rect(window);
+                //                xcwm_rect_t *winRect = xcwm_window_get_full_rect(window);
                 xcwm_rect_t *dmgRect = xcwm_window_get_damaged_rect(window);
 
-                DEBUG("full_rect is %ldx%ld @ (%ld, %ld)\n", winRect->width, winRect->height, winRect->x, winRect->y);
-                DEBUG("damaged rect is %ldx%ld @ (%ld, %ld)\n", dmgRect->width, dmgRect->height, dmgRect->x, dmgRect->y);
-                DEBUG("invalidated rect is %ldx%ld @ (%ld, %ld)\n", ps.rcPaint.right - ps.rcPaint.left, ps.rcPaint.bottom - ps.rcPaint.top, ps.rcPaint.left, ps.rcPaint.top);
+                // DEBUG("full_rect is %ldx%ld @ (%ld, %ld)\n", winRect->width, winRect->height, winRect->x, winRect->y);
+                // DEBUG("damaged rect is %ldx%ld @ (%ld, %ld)\n", dmgRect->width, dmgRect->height, dmgRect->x, dmgRect->y);
+                // DEBUG("invalidated rect is %ldx%ld @ (%ld, %ld)\n", ps.rcPaint.right - ps.rcPaint.left, ps.rcPaint.bottom - ps.rcPaint.top, ps.rcPaint.left, ps.rcPaint.top);
 
                 assert(image->image->scanline_pad = 32); // DIBs are always 32 bit aligned
                 assert(((int)image->image->data % 4) == 0); // ?
 
-                // XXX: probably should use BITMAPV5HEADER ?
                 // describe the bitmap format we are given
                 BITMAPINFO diBmi;
                 memset(&diBmi, 0, sizeof(diBmi));
                 diBmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
                 diBmi.bmiHeader.biWidth = image->width;
-                diBmi.bmiHeader.biHeight = -image->height;
+                diBmi.bmiHeader.biHeight = -image->height; // top-down bitmap
                 diBmi.bmiHeader.biPlanes = 1;
                 diBmi.bmiHeader.biBitCount = image->image->bpp;
                 diBmi.bmiHeader.biCompression = BI_RGB;
@@ -838,19 +841,13 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 diBmi.bmiHeader.biClrImportant = 0;
                 // diBmi.bmiColors unused unless biBitCount is 8 or less, or biCompression is BI_BITFIELDS, or biClrUsed is non-zero...
 
-#if 0
-                int lines = SetDIBitsToDevice(hdcUpdate, dmgRect->x, dmgRect->y, dmgRect->width, dmgRect->height,
-                                              0, 0, 0, image->height, image->image->data, &diBmi, DIB_RGB_COLORS);
-#endif
-
                 int lines = StretchDIBits(hdcUpdate,
                                           dmgRect->x, dmgRect->y, dmgRect->width, dmgRect->height,
                                           0, 0, image->width, image->height,
                                           image->image->data, &diBmi, DIB_RGB_COLORS, SRCCOPY);
 
-                DEBUG("returned %d\n", lines);
-                if (lines == 0)
-                  fprintf(stderr, "failed: 0x%08x\n", GetLastError());
+                if (lines <= 0)
+                  fprintf(stderr, "StretchDIBits: returned %d, failed: 0x%08lx\n", lines, GetLastError());
 
 #if 0
                 // create compatible DC, create a device compatible bitmap from the image, and select it into the DC
@@ -861,7 +858,7 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 // transfer the bits from our compatible DC to the display
                 if (!BitBlt(hdcUpdate, dmgRect->x, dmgRect->y, dmgRect->width, dmgRect->height, hdcMem, 0, 0, SRCCOPY))
                   {
-                    fprintf(stderr, "winTopLevelWindowProc: BitBlt failed: 0x%08x\n", GetLastError());
+                    fprintf(stderr, "winTopLevelWindowProc: BitBlt failed: 0x%08lx\n", GetLastError());
                   }
 
                 SelectObject(hdcMem, hStockBitmap);
@@ -917,8 +914,7 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
           }
 
         /* Translate Windows key code to X scan code */
-        int iScanCode;
-        winTranslateKey(wParam, lParam, &iScanCode);
+        int iScanCode = winTranslateKey(wParam, lParam);
 
         /* Ignore press repeats for CapsLock */
         if (press && (wParam == VK_CAPITAL))
@@ -927,7 +923,7 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         /* Send the key event(s) */
         int i;
         for (i = 0; i < LOWORD(lParam); ++i)
-          winSendKeyEvent(iScanCode, TRUE);
+          winSendKeyEvent(iScanCode, press);
 
         /* Release all pressed shift keys */
         if (!press && (wParam == VK_SHIFT))
@@ -987,24 +983,24 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     case WM_LBUTTONDBLCLK:
     case WM_LBUTTONDOWN:
-      return winMouseButtonsHandle(window, TRUE, 0, hWnd, lParam);
+      return winMouseButtonsHandle(window, TRUE, 1, hWnd, lParam);
 
     case WM_LBUTTONUP:
-      return winMouseButtonsHandle(window, FALSE, 0, hWnd, lParam);
+      return winMouseButtonsHandle(window, FALSE, 1, hWnd, lParam);
 
     case WM_MBUTTONDBLCLK:
     case WM_MBUTTONDOWN:
-      return winMouseButtonsHandle(window, TRUE, 1, hWnd, lParam);
+      return winMouseButtonsHandle(window, TRUE, 2, hWnd, lParam);
 
     case WM_MBUTTONUP:
-      return winMouseButtonsHandle(window, FALSE, 1, hWnd, lParam);
+      return winMouseButtonsHandle(window, FALSE, 2, hWnd, lParam);
 
     case WM_RBUTTONDBLCLK:
     case WM_RBUTTONDOWN:
-      return winMouseButtonsHandle(window, TRUE, 2, hWnd, lParam);
+      return winMouseButtonsHandle(window, TRUE, 3, hWnd, lParam);
 
     case WM_RBUTTONUP:
-      return winMouseButtonsHandle(window, FALSE, 2, hWnd, lParam);
+      return winMouseButtonsHandle(window, FALSE, 3, hWnd, lParam);
 
     case WM_XBUTTONDBLCLK:
     case WM_XBUTTONDOWN:
@@ -1117,7 +1113,7 @@ winCreateWindowsWindow(xcwm_window_t *window)
   /* Make it WS_OVERLAPPED in create call since WS_POPUP doesn't support */
   /* CW_USEDEFAULT, change back to popup after creation */
   dwStyle = WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
-  dwExStyle = WS_EX_TOOLWINDOW;
+  dwExStyle = WS_EX_TOOLWINDOW | WS_EX_LAYERED;
 
   /*
     Calculate the window coordinates containing the requested client area,
@@ -1196,8 +1192,8 @@ winCreateWindowsWindow(xcwm_window_t *window)
     }
 
   /* XXX: set reasonable style, for now */
-  SetWindowLongPtr(hWnd, GWL_EXSTYLE, WS_EX_APPWINDOW);
-  SetWindowLongPtr(hWnd, GWL_STYLE, GetWindowLongPtr(hWnd, GWL_STYLE) | WS_SYSMENU | WS_BORDER | WS_CAPTION);
+  SetWindowLongPtr(hWnd, GWL_EXSTYLE, (GetWindowLongPtr(hWnd, GWL_STYLE) & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW);
+  SetWindowLongPtr(hWnd, GWL_STYLE, GetWindowLongPtr(hWnd, GWL_STYLE) | WS_SYSMENU | WS_BORDER | WS_CAPTION | WS_SIZEBOX);
 
   /* Apply all properties which effect the window appearance or behaviour */
   UpdateName(window);
@@ -1213,7 +1209,11 @@ winCreateWindowsWindow(xcwm_window_t *window)
   /* Display the window without activating it */
   if (attr->_class != XCB_WINDOW_CLASS_INPUT_ONLY)
 #endif
-    ShowWindow (hWnd, SW_SHOWNOACTIVATE);
+    {
+      BYTE bAlpha = xcwm_window_get_opacity(window) >> 24;
+      SetLayeredWindowAttributes(hWnd, RGB(0,0,0), bAlpha, LWA_ALPHA);
+      ShowWindow(hWnd, SW_SHOWNOACTIVATE);
+    }
 }
 
 void

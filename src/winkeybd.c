@@ -1,5 +1,4 @@
-/* Copyright (c) 2012 Jon TURNEY
- *
+/*
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
  * files (the "Software"), to deal in the Software without
@@ -26,6 +25,7 @@
 
 #include "debug.h"
 #include "global.h"
+#include "winvkmap.h"
 #include "winkeybd.h"
 
 static bool g_winKeyState[NUM_KEYCODES];
@@ -39,13 +39,14 @@ static bool g_winKeyState[NUM_KEYCODES];
  * like AltGr on European keyboards.
  */
 
-void
-winTranslateKey(WPARAM wParam, LPARAM lParam, int *piScanCode)
+int
+winTranslateKey(WPARAM wParam, LPARAM lParam)
 {
     int iKeyFixup = g_iKeyMap[wParam * WIN_KEYMAP_COLS + 1];
     int iKeyFixupEx = g_iKeyMap[wParam * WIN_KEYMAP_COLS + 2];
     int iParam = HIWORD(lParam);
     int iParamScanCode = LOBYTE(iParam);
+    int iScanCode;
 
     DEBUG("winTranslateKey: wParam %08x lParam %08x\n", wParam, lParam);
 
@@ -70,23 +71,25 @@ winTranslateKey(WPARAM wParam, LPARAM lParam, int *piScanCode)
 
     /* Branch on special extended, special non-extended, or normal key */
     if ((iParam & KF_EXTENDED) && iKeyFixupEx)
-        *piScanCode = iKeyFixupEx;
+        iScanCode = iKeyFixupEx;
     else if (iKeyFixup)
-        *piScanCode = iKeyFixup;
+        iScanCode = iKeyFixup;
     else if (wParam == 0 && iParamScanCode == 0x70)
-        *piScanCode = KEY_HKTG;
+        iScanCode = KEY_HKTG;
     else
         switch (iParamScanCode) {
         case 0x70:
-            *piScanCode = KEY_HKTG;
+            iScanCode = KEY_HKTG;
             break;
         case 0x73:
-            *piScanCode = KEY_BSlash2;
+            iScanCode = KEY_BSlash2;
             break;
         default:
-            *piScanCode = iParamScanCode;
+            iScanCode = iParamScanCode;
             break;
         }
+
+    return iScanCode;
 }
 
 /*
@@ -177,7 +180,7 @@ winIsFakeCtrl_L(UINT message, WPARAM wParam, LPARAM lParam)
 
         /* Is next press an Alt_R with the same timestamp? */
         if (fReturn && msgNext.wParam == VK_MENU
-            && msgNext.time == lTime
+            && msgNext.time == (DWORD)lTime
             && (HIWORD(msgNext.lParam) & KF_EXTENDED)) {
             /*
              * Next key press is Alt_R with same timestamp as current
@@ -232,7 +235,7 @@ winIsFakeCtrl_L(UINT message, WPARAM wParam, LPARAM lParam)
         if (fReturn
             && (msgNext.message == WM_KEYUP || msgNext.message == WM_SYSKEYUP)
             && msgNext.wParam == VK_MENU
-            && msgNext.time == lTime
+            && msgNext.time == (DWORD)lTime
             && (HIWORD(msgNext.lParam) & KF_EXTENDED)) {
             /*
              * Next key release is Alt_R with same timestamp as current
@@ -252,7 +255,7 @@ winIsFakeCtrl_L(UINT message, WPARAM wParam, LPARAM lParam)
     return FALSE;
 }
 
-BOOL
+bool
 winCheckKeyPressed(WPARAM wParam, LPARAM lParam)
 {
     switch (wParam) {

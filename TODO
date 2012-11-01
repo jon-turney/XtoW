@@ -1,10 +1,20 @@
 TODO for XtoW
 =============
 
+goals:
+
+* use xcb
+* not built into server
+* use native composting
+
 new features
 
 * we always have access to full contents of window (when mapped), so previewing, thumbnailing, etc. works correctly
 * we have access to a window pixmap with alpha channel, so windows are composed into native desktop
+* interleaving of native and X windows in Z-order should work correctly
+* update WM without restarting X applications or server (for faster development :-))
+* fixes punch-through?
+* separate window message pump thread, so we can update window during modal loops (e.g. resizing)
 
 features missing compared to XWin's integrated WM
 
@@ -24,11 +34,14 @@ getting the ones that the windows shell isn't using (e.g. Windows key, Menu key,
 * Set the X keyboard configuration to match the native one
 * Synchronize the X server modifier key state with the native one at startup, and whenever an X window gains focus (as modifiers might have been latched or unlatched without us noticing)
 * Faster way of getting the bits onto the screen than GDI BitBlt() (e.g. DirectDraw)
+* -hostintitle option to add WM_CLIENT_MACHINE to window title, if not localhost
 
 other stuff:
 
-* lcwm doesn't adopt any existing windows when it starts
-* lcwm doesn't understand about InputOnly windows (probably should just ignore them)
+* libxcwm doesn't adopt any existing windows when it starts
+* libxcwm doesn't understand about InputOnly windows (probably should just ignore them)
+* libxcwm doesn't looks at _MOTIF_WM_HINTS (maybe only hints we get from old motif applications?)
+* libxcwm assumes window properties are constant while mapped; this isn't true; for every property it looks at, it should also listen for changes to that property
 * support the _NET_WM_WINDOW_OPACITY property using layered windows on XP, even if we can't use alpha
 
 * Libraryize the code which is currently copied out of the Xserver
@@ -36,3 +49,14 @@ other stuff:
 - XWin on MinGW is going to be around for a while, and I don't need the maintainance headache
 
 * Implement -version command line option
+
+* xcwm doesn't really take advantage of xcb async in all places
+
+native compostion notes (08/11/11):
+
+- DwmEnableBlurBehindWindows()
+- UdpateLayeredWindow() - compose in a src bitmap with alpha channel; use for window position/size change as well for maximum rendering performance
+- SetLayeredWindowAttributes() - sets an alpha value for whole windows
+
+* XtoW needs to use libxcwm style conversion
+* Need to use RENDER rather than XCopyArea() to access image to ensure we get alpha???

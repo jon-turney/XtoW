@@ -25,6 +25,7 @@
 
 #include "debug.h"
 #include "global.h"
+#include "wndproc.h"
 
 #define WM_XCWM_CREATE  WM_USER
 #define WM_XCWM_DESTROY (WM_USER+1)
@@ -32,7 +33,7 @@
 xcwm_context_t *context;
 DWORD msgPumpThread;
 
-void
+static void
 eventHandler(const xcwm_event_t *event)
 {
     xcwm_window_t *window = xcwm_event_get_window(event);
@@ -71,7 +72,7 @@ eventHandler(const xcwm_event_t *event)
         break;
       }
 
-    free(event);
+    free((void *)event);
 }
 
 static void
@@ -133,9 +134,9 @@ int main(int argc, char **argv)
   while (GetMessage(&msg, NULL, 0, 0) > 0)
     {
       if (msg.message == WM_XCWM_CREATE)
-        winCreateWindowsWindow(msg.lParam);
+        winCreateWindowsWindow((xcwm_window_t *)msg.lParam);
       else if (msg.message == WM_XCWM_DESTROY)
-        winDestroyWindowsWindow(msg.lParam);
+        winDestroyWindowsWindow((xcwm_window_t *)msg.lParam);
       else
         DispatchMessage(&msg);
     }

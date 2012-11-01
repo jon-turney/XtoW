@@ -17,9 +17,12 @@
 // along with XtoW.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if 1
-int debug(const char *format, ...);
-#define DEBUG debug
-#else
-#define DEBUG(Args...)
-#endif
+#ifndef WNDPROC_H
+#define WNDPROC_H
+
+void UpdateName(xcwm_window_t *window);
+void UpdateImage(xcwm_window_t *window);
+void winCreateWindowsWindow(xcwm_window_t *window);
+void winDestroyWindowsWindow(xcwm_window_t *window);
+
+#endif /* WNDPROC_H */
