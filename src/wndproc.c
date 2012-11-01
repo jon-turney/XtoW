@@ -218,6 +218,126 @@ UpdateImage(xcwm_window_t *window)
   InvalidateRect(hWnd, &damage, FALSE);
 }
 
+/* Windows window styles */
+#define HINT_FRAME	 (1<<0) /* any decoration */
+#define HINT_SIZEFRAME	 (1<<2) /* a resizing frame */
+#define HINT_CAPTION	 (1<<3) /* a title bar */
+#define HINT_MAXIMIZE    (1<<4)
+#define HINT_MINIMIZE    (1<<5)
+#define HINT_SYSMENU     (1<<6)
+#define HINT_SKIPTASKBAR (1<<7)
+
+static void
+winApplyStyle(xcwm_window_t *window)
+{
+  HWND hWnd = xcwm_window_get_local_data(window);
+  xcwm_window_type_t window_type = xcwm_window_get_window_type(window);
+  HWND zstyle = HWND_NOTOPMOST;
+  unsigned int hint = 0;
+
+  if (!hWnd)
+    return;
+
+  switch (window_type)
+    {
+    case XCWM_WINDOW_TYPE_UNKNOWN:
+    case XCWM_WINDOW_TYPE_NORMAL:
+      hint = HINT_FRAME | HINT_MAXIMIZE | HINT_MINIMIZE | HINT_SYSMENU | HINT_SIZEFRAME | HINT_CAPTION;
+      break;
+
+    case XCWM_WINDOW_TYPE_DIALOG:
+    case XCWM_WINDOW_TYPE_NOTIFICATION:
+      hint = HINT_FRAME | HINT_MAXIMIZE | HINT_MINIMIZE | HINT_SYSMENU | HINT_SIZEFRAME | HINT_CAPTION;
+      break;
+
+    case XCWM_WINDOW_TYPE_TOOLTIP:
+      break;
+
+    case XCWM_WINDOW_TYPE_SPLASH:
+    case XCWM_WINDOW_TYPE_DESKTOP:
+      zstyle = HWND_TOPMOST;
+      break;
+
+    case XCWM_WINDOW_TYPE_DND:
+    case XCWM_WINDOW_TYPE_DOCK:
+      /* questionable correctness */
+      hint = HINT_FRAME | HINT_SIZEFRAME;
+      zstyle = HWND_TOPMOST;
+      break;
+
+    case XCWM_WINDOW_TYPE_POPUP_MENU:
+    case XCWM_WINDOW_TYPE_DROPDOWN_MENU:
+    case XCWM_WINDOW_TYPE_COMBO:
+      hint |= HINT_SKIPTASKBAR;
+      break;
+
+    case XCWM_WINDOW_TYPE_UTILITY:
+    case XCWM_WINDOW_TYPE_TOOLBAR:
+    case XCWM_WINDOW_TYPE_MENU:
+      hint |= HINT_SKIPTASKBAR;
+      break;
+    }
+
+  if (window->hints.flags & XCB_ICCCM_SIZE_HINT_P_MAX_SIZE)
+    {
+      /* Not maximizable if a maximum size is specified */
+      hint &= ~HINT_MAXIMIZE;
+
+      if (window->hints.flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE)
+        {
+          /*
+            (per EWMH Implementation Notes, section "Fixed Size windows")
+            If both minimum size and maximum size are specified and are the same,
+            don't bother with a resizing frame
+          */
+          if ((window->hints.min_width == window->hints.max_width)
+              && (window->hints.min_height == window->hints.max_height))
+            hint = (hint & ~HINT_SIZEFRAME);
+        }
+    }
+
+  /* Now apply styles to window */
+  DWORD style, exStyle;
+  style = GetWindowLongPtr(hWnd, GWL_STYLE);
+  exStyle = GetWindowLongPtr(hWnd, GWL_EXSTYLE);
+  /* GetWindowLongPointer returns 0 on failure, we hope this isn't a valid style */
+
+  style = style & ~WS_CAPTION & ~WS_SIZEBOX;
+
+  if (hint & HINT_FRAME)
+    style = style | ((hint & HINT_FRAME) ? WS_BORDER : 0) |
+      ((hint & HINT_SIZEFRAME) ? WS_SIZEBOX : 0) |
+      ((hint & HINT_CAPTION) ? WS_CAPTION : 0);
+
+  if (hint & HINT_MAXIMIZE)
+    style = style | WS_MAXIMIZEBOX;
+
+  if (hint & HINT_MINIMIZE)
+    style = style | WS_MINIMIZEBOX;
+
+  if (hint & HINT_SYSMENU)
+    style = style | WS_SYSMENU;
+
+  if (hint & HINT_SKIPTASKBAR)
+    style = style & ~WS_MINIMIZEBOX; /* otherwise, window will become lost if minimized */
+
+  if (hint & HINT_SKIPTASKBAR)
+    exStyle = (exStyle & ~WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW;
+  else
+    exStyle = (exStyle & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW;
+
+  SetWindowLongPtr(hWnd, GWL_STYLE, style);
+  SetWindowLongPtr(hWnd, GWL_EXSTYLE, exStyle);
+
+  DEBUG("winApplyHints: id 0x%08x hints 0x%08x style 0x%08x exstyle 0x%08x\n", window->window_id, hint, style, exStyle);
+
+  /* Apply the updated window style, without changing it's show or activation state */
+  UINT flags = SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE;
+  if (zstyle == HWND_NOTOPMOST)
+    flags |= SWP_NOZORDER | SWP_NOOWNERZORDER;
+  SetWindowPos(hWnd, NULL, 0, 0, 0, 0, flags);
+}
+
 #if 0
 
 #define		MwmHintsDecorations	(1L << 1)
@@ -238,15 +358,6 @@ typedef struct MwmHints {
 
 #define		PropMwmHintsElements	3
 
-/* Windows window styles */
-#define HINT_NOFRAME	(1l<<0)
-#define HINT_BORDER	(1L<<1)
-#define HINT_SIZEBOX	(1l<<2)
-#define HINT_CAPTION	(1l<<3)
-#define HINT_NOMAXIMIZE (1L<<4)
-#define HINT_NOMINIMIZE (1L<<5)
-#define HINT_NOSYSMENU  (1L<<6)
-#define HINT_SKIPTASKBAR (1L<<7)
 /* These two are used on their own */
 #define HINT_MAX	(1L<<0)
 #define HINT_MIN	(1L<<1)
@@ -260,10 +371,8 @@ winApplyHints(xcb_drawable_t id, HWND hWnd, HWND *zstyle)
   static bool got_atoms = FALSE;
   unsigned long hint = 0, maxmin = 0;
   int nitems = 0;
-  unsigned long style, exStyle;
-  xcb_get_property_reply_t *reply;
 
-  *zstyle = HWND_NOTOPMOST;
+  xcb_get_property_reply_t *reply;
 
   if (!hWnd)
     return;
@@ -272,14 +381,12 @@ winApplyHints(xcb_drawable_t id, HWND hWnd, HWND *zstyle)
 
   if (!got_atoms)
     {
-      windowState = atom_get(conn, "_NET_WM_STATE");
       motif_wm_hints = atom_get(conn, "_MOTIF_WM_HINTS");
       windowType = atom_get(conn, "_NET_WM_WINDOW_TYPE");
       hiddenState = atom_get(conn, "_NET_WM_STATE_HIDDEN");
       fullscreenState = atom_get(conn, "_NET_WM_STATE_FULLSCREEN");
       belowState = atom_get(conn, "_NET_WM_STATE_BELOW");
       aboveState = atom_get(conn, "_NET_WM_STATE_ABOVE");
-      dockWindow = atom_get(conn, "_NET_WM_WINDOW_TYPE_DOCK");
       skiptaskbarState = atom_get(conn, "_NET_WM_STATE_SKIP_TASKBAR");
       got_atoms = TRUE;
     }
@@ -348,118 +455,28 @@ winApplyHints(xcb_drawable_t id, HWND hWnd, HWND *zstyle)
       free(reply);
     }
 
-  if ((reply = xcb_get_property_reply(conn, cookie_wm_window_type, NULL)))
-    {
-      nitems = xcb_get_property_value_length(reply);
-      xcb_atom_t *pAtom = xcb_get_property_value(reply);
-
-      if (pAtom && nitems == 1)
-        {
-          if (*pAtom == dockWindow)
-            {
-              /* puts a sizebox on dock windows */
-              hint = (hint & ~HINT_NOFRAME) | HINT_SIZEBOX;
-              *zstyle = HWND_TOPMOST;
-            }
-        }
-
-      free(reply);
-    }
-
-  {
-    xcb_size_hints_t normal_hint;
-
-    if (xcb_icccm_get_wm_normal_hints_reply(conn, cookie_normal_hints, &normal_hint, NULL))
-      {
-        if (normal_hint.flags & XCB_ICCCM_SIZE_HINT_P_MAX_SIZE)
-          {
-            /* Not maximizable if a maximum size is specified */
-            hint |= HINT_NOMAXIMIZE;
-
-            if (normal_hint.flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE)
-              {
-                /*
-                  If both minimum size and maximum size are specified and are the same,
-                  don't bother with a resizing frame
-                */
-                if ((normal_hint.min_width == normal_hint.max_width)
-                    && (normal_hint.min_height == normal_hint.max_height))
-                  hint = (hint & ~HINT_SIZEBOX);
-              }
-          }
-      }
-  }
-
-  /* XXX: Override hint settings from above with settings from config file */
-  /* XXX: set application id from class hint for native window grouping */
-
   /* XXX: this should only happen on initial show */
   if (maxmin & HINT_MAX)
     SendMessage(hWnd, WM_SYSCOMMAND, SC_MAXIMIZE, 0);
   else if (maxmin & HINT_MIN)
     SendMessage(hWnd, WM_SYSCOMMAND, SC_MINIMIZE, 0);
-
-  /* Now apply styles to window */
-  style = GetWindowLongPtr(hWnd, GWL_STYLE) & ~WS_CAPTION & ~WS_SIZEBOX;      /* Just in case */
-  if (!style)
-    return; /* GetWindowLongPointer returns 0 on failure, we hope this isn't a valid style */
-
-  if (!(hint & ~HINT_SKIPTASKBAR))    /* All on */
-    style = style | WS_CAPTION | WS_SIZEBOX;
-  else if (hint & HINT_NOFRAME)       /* All off */
-    style = style & ~WS_CAPTION & ~WS_SIZEBOX;
-  else
-    style = style | ((hint & HINT_BORDER) ? WS_BORDER : 0) |
-      ((hint & HINT_SIZEBOX) ? WS_SIZEBOX : 0) |
-      ((hint & HINT_CAPTION) ? WS_CAPTION : 0);
-
-  if (hint & HINT_NOMAXIMIZE)
-    style = style & ~WS_MAXIMIZEBOX;
-
-  if (hint & HINT_NOMINIMIZE)
-    style = style & ~WS_MINIMIZEBOX;
-
-  if (hint & HINT_NOSYSMENU)
-    style = style & ~WS_SYSMENU;
-
-  if (hint & HINT_SKIPTASKBAR)
-    style = style & ~WS_MINIMIZEBOX;        /* otherwise, window will become lost if minimized */
-
-  SetWindowLongPtr(hWnd, GWL_STYLE, style);
-
-  exStyle = GetWindowLongPtr(hWnd, GWL_EXSTYLE);
-  if (hint & HINT_SKIPTASKBAR)
-    exStyle = (exStyle & ~WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW;
-  else
-    exStyle = (exStyle & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW;
-  SetWindowLongPtr(hWnd, GWL_EXSTYLE, exStyle);
-
-  DEBUG("winApplyHints: id 0x%08x hints 0x%08x style 0x%08x exstyle 0x%08x\n",
-           id, hint, style, exStyle);
 }
+
+#endif
 
 /*
  * Updates the style of a HWND according to its X style properties
  */
 static void
-UpdateStyle(struct client *pWin)
+UpdateStyle(xcwm_window_t *window)
 {
-  HWND hWnd = pWin->hWnd;
-  HWND zstyle = HWND_NOTOPMOST;
-  UINT flags;
 #if 0
+  HWND hWnd = xcwm_window_get_local_data(window);
   bool onTaskbar;
 #endif
 
   /* Determine the Window style */
-  winApplyHints(pWin->id, hWnd, &zstyle);
-  winUpdateWindowPosition(hWnd, &zstyle);
-
-  /* Apply the updated window style, without changing it's show or activation state */
-  flags = SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE;
-  if (zstyle == HWND_NOTOPMOST)
-    flags |= SWP_NOZORDER | SWP_NOOWNERZORDER;
-  SetWindowPos(hWnd, NULL, 0, 0, 0, 0, flags);
+  winApplyStyle(window);
 
 #if 0
   /*
@@ -478,8 +495,6 @@ UpdateStyle(struct client *pWin)
   winApplyUrgency(pWMInfo->pDisplay, iWindow, hWnd);
 #endif
 }
-
-#endif
 
 /* Don't allow window decoration to disappear off to top-left */
 static void
@@ -1191,17 +1206,11 @@ winCreateWindowsWindow(xcwm_window_t *window)
       /* zstyle = SWP_TOPMOST; */
     }
 
-  /* XXX: set reasonable style, for now */
-  SetWindowLongPtr(hWnd, GWL_EXSTYLE, (GetWindowLongPtr(hWnd, GWL_STYLE) & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW);
-  SetWindowLongPtr(hWnd, GWL_STYLE, GetWindowLongPtr(hWnd, GWL_STYLE) | WS_SYSMENU | WS_BORDER | WS_CAPTION | WS_SIZEBOX);
-
   /* Apply all properties which effect the window appearance or behaviour */
   UpdateName(window);
   /* UpdateIcon(); */
-#if 0
   if (!xcwm_window_is_override_redirect(window))
     UpdateStyle(window);
-#endif
 
   BumpWindowPosition(hWnd);
 

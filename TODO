@@ -35,6 +35,8 @@ getting the ones that the windows shell isn't using (e.g. Windows key, Menu key,
 * Synchronize the X server modifier key state with the native one at startup, and whenever an X window gains focus (as modifiers might have been latched or unlatched without us noticing)
 * Faster way of getting the bits onto the screen than GDI BitBlt() (e.g. DirectDraw)
 * -hostintitle option to add WM_CLIENT_MACHINE to window title, if not localhost
+* Override window style settings using a config file (useful?)
+* set native application id from class hint for native window grouping
 
 other stuff:
 
@@ -60,3 +62,7 @@ native compostion notes (08/11/11):
 
 * XtoW needs to use libxcwm style conversion
 * Need to use RENDER rather than XCopyArea() to access image to ensure we get alpha???
+
+* Need to store bits so we can draw them for WM_PAINT without having to ask server..
+(xcwm_image_copy_full() to get the full window image, but do we need to do this on init map, or will whole window get damage?)
+(Or would using UpdatedLayeredWindow() avoid that need...)
