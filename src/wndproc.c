@@ -159,7 +159,7 @@ winAdjustXWindow (xcwm_window_t *window, HWND hWnd)
 
   DEBUG("ConfigureWindow to %ldx%ld @ (%ld, %ld)\n", w, h, p.x, p.y);
 
-  xcwm_window_configure(window, p.x, p.y, h, w);
+  xcwm_window_configure(window, p.x, p.y, w, h);
 
  return 1;
 
