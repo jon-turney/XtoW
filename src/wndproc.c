@@ -24,6 +24,7 @@
 
 #include <windows.h>
 #include <windowsx.h>
+#include <dwmapi.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <assert.h>
@@ -39,6 +40,8 @@
 #define WIN_WID_PROP "cyg_wid_prop"
 #define WIN_XCWM_PROP "cyg_xcwm_prop"
 #define WIN_HDWP_PROP "cyg_hdwp_prop"
+
+int blur = 0;
 
 /*
  * ValidateSizing - Ensures size request respects hints
@@ -617,7 +620,7 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
   /* XXX: a global is wrong if WM_MOUSEMOVE of the new window is delivered before WM_MOUSELEAVE of the old? Use HWND instead? */
   static bool s_fTracking = FALSE;
 
-  winDebugWin32Message("winTopLevelWindowProc", hWnd, message, wParam, lParam);
+  //  winDebugWin32Message("winTopLevelWindowProc", hWnd, message, wParam, lParam);
 
   if (message == WM_CREATE)
     {
@@ -836,11 +839,38 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 xcwm_rect_t *dmgRect = xcwm_window_get_damaged_rect(window);
 
                 // DEBUG("full_rect is %ldx%ld @ (%ld, %ld)\n", winRect->width, winRect->height, winRect->x, winRect->y);
-                // DEBUG("damaged rect is %ldx%ld @ (%ld, %ld)\n", dmgRect->width, dmgRect->height, dmgRect->x, dmgRect->y);
-                // DEBUG("invalidated rect is %ldx%ld @ (%ld, %ld)\n", ps.rcPaint.right - ps.rcPaint.left, ps.rcPaint.bottom - ps.rcPaint.top, ps.rcPaint.left, ps.rcPaint.top);
+                DEBUG("damaged rect is %ldx%ld @ (%ld, %ld)\n", dmgRect->width, dmgRect->height, dmgRect->x, dmgRect->y);
+                DEBUG("invalidated rect is %ldx%ld @ (%ld, %ld)\n", ps.rcPaint.right - ps.rcPaint.left, ps.rcPaint.bottom - ps.rcPaint.top, ps.rcPaint.left, ps.rcPaint.top);
+                DEBUG("damage image has bpp %d, depth %d\n", image->image->bpp, image->image->depth);
 
                 assert(image->image->scanline_pad = 32); // DIBs are always 32 bit aligned
                 assert(((int)image->image->data % 4) == 0); // ?
+
+                /* image has alpha? */
+                if (image->image->depth == 32)
+                  {
+                    /* XXX: only do this once, for each window */
+                    HRGN dummyRegion = NULL;
+
+                    /* restricting the blur effect to a dummy region means the rest is unblurred */
+                    if (!blur)
+                      dummyRegion = CreateRectRgn(-1, -1, 0, 0);
+
+                    DWM_BLURBEHIND bbh;
+                    bbh.dwFlags = DWM_BB_ENABLE | DWM_BB_BLURREGION |DWM_BB_TRANSITIONONMAXIMIZED;
+                    bbh.fEnable = TRUE;
+                    bbh.hRgnBlur = dummyRegion;
+                    bbh.fTransitionOnMaximized = TRUE; /* What does this do ??? */
+
+                    // need to re-issue this on WM_DWMCOMPOSITIONCHANGED
+                    DEBUG("enabling alpha, blur %s\n", blur ? "on" : "off");
+                    HRESULT rc = DwmEnableBlurBehindWindow(hWnd, &bbh);
+                    if (rc != S_OK)
+                      fprintf(stderr, "DwmEnableBlurBehindWindow failed: %d\n", (int) GetLastError());
+
+                    if (dummyRegion)
+                      DeleteObject(dummyRegion);
+                  }
 
                 // describe the bitmap format we are given
                 BITMAPINFO diBmi;
@@ -856,19 +886,14 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 diBmi.bmiHeader.biClrImportant = 0;
                 // diBmi.bmiColors unused unless biBitCount is 8 or less, or biCompression is BI_BITFIELDS, or biClrUsed is non-zero...
 
-                int lines = StretchDIBits(hdcUpdate,
-                                          dmgRect->x, dmgRect->y, dmgRect->width, dmgRect->height,
-                                          0, 0, image->width, image->height,
-                                          image->image->data, &diBmi, DIB_RGB_COLORS, SRCCOPY);
-
-                if (lines <= 0)
-                  fprintf(stderr, "StretchDIBits: returned %d, failed: 0x%08lx\n", lines, GetLastError());
-
-#if 0
                 // create compatible DC, create a device compatible bitmap from the image, and select it into the DC
                 HDC hdcMem = CreateCompatibleDC(hdcUpdate);
-                HBITMAP hBitmap = CreateDIBitmap(hdcMem, &(diBmi.bmiHeader), CBM_INIT, image->image->data, &diBmi, DIB_RGB_COLORS);
+                HBITMAP hBitmap = CreateDIBitmap(hdcUpdate, &(diBmi.bmiHeader), CBM_INIT, image->image->data, &diBmi, DIB_RGB_COLORS);
                 HBITMAP hStockBitmap = SelectObject(hdcMem, hBitmap);
+
+                BITMAP b;
+                GetObject(hBitmap, sizeof(b), &b);
+                DEBUG("DDB has %d bpp\n", b.bmBitsPixel);
 
                 // transfer the bits from our compatible DC to the display
                 if (!BitBlt(hdcUpdate, dmgRect->x, dmgRect->y, dmgRect->width, dmgRect->height, hdcMem, 0, 0, SRCCOPY))
@@ -879,7 +904,6 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 SelectObject(hdcMem, hStockBitmap);
                 DeleteObject(hBitmap);
                 DeleteDC(hdcMem);
-#endif
 
                 // Remove the damage
                 xcwm_window_remove_damage(window);
@@ -1074,6 +1098,7 @@ winCreateWindowsWindow(xcwm_window_t *window)
   RECT rc;
 
   winInitMultiWindowClass();
+  assert(xcwm_window_get_local_data(window) == NULL);
 
   DEBUG("winCreateWindowsWindow: window 0x%08x XID 0x%08x\n", window, window->window_id);
 

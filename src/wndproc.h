@@ -25,4 +25,6 @@ void UpdateImage(xcwm_window_t *window);
 void winCreateWindowsWindow(xcwm_window_t *window);
 void winDestroyWindowsWindow(xcwm_window_t *window);
 
+extern int blur;
+
 #endif /* WNDPROC_H */

@@ -79,6 +79,7 @@ static void
 help(void)
 {
   fprintf(stderr, "usage: xtow [options]\n");
+  fprintf(stderr, "-blur        use glass effect to blur the image beneath transparent areas\n");
   fprintf(stderr, "-display dpy display to manage windows on\n");
   fprintf(stderr, "-help\n");
   exit(0);
@@ -94,6 +95,7 @@ int main(int argc, char **argv)
         {
           { "display", required_argument, 0, 'd' },
           { "help",    no_argument, 0, 'h' },
+          { "blur",    no_argument, 0, 'b' },
           {0, 0, 0, 0 },
         };
 
@@ -107,6 +109,9 @@ int main(int argc, char **argv)
         {
         case 'd':
           screen = optarg;
+          break;
+        case 'b':
+          blur = 1;
           break;
         case 'h':
         default:

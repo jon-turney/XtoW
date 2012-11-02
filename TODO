@@ -9,7 +9,7 @@ goals:
 
 new features
 
-* we always have access to full contents of window (when mapped), so previewing, thumbnailing, etc. works correctly
+* we always have access to full contents of window (when mapped), so resizing one X window covering another, previewing, thumbnailing, etc. works correctly
 * we have access to a window pixmap with alpha channel, so windows are composed into native desktop
 * interleaving of native and X windows in Z-order should work correctly
 * update WM without restarting X applications or server (for faster development :-))
