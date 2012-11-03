@@ -278,13 +278,9 @@ BitBltFromImage(xcwm_image_t *image, HDC hdcUpdate,
 void
 UpdateImage(xcwm_window_t *window)
 {
-  xcwm_rect_t *dmgRect = xcwm_window_get_damaged_rect(window);
-
-  RECT damage;
-  damage.left = dmgRect->x;
-  damage.top = dmgRect->y;
-  damage.right = dmgRect->x + dmgRect->width;
-  damage.bottom = dmgRect->y + dmgRect->height;
+  /* stop xcwm processing events so it can't change
+     this damage while we are using it */
+  xcwm_event_get_thread_lock();
 
   /*
     We may not have a hWnd yet, if the window is still being created when this
@@ -294,15 +290,47 @@ UpdateImage(xcwm_window_t *window)
   HWND hWnd = xcwm_window_get_local_data(window);
   if (hWnd)
     {
-      DEBUG("UpdateImage: invalidating %dx%d @ %d,%d on HWND 0x08%x\n", dmgRect->width, dmgRect->height, dmgRect->x, dmgRect->y, hWnd);
-      InvalidateRect(hWnd, &damage, FALSE);
+      xcwm_image_t *image;
+      image = xcwm_image_copy_damaged(window);
+      if (image)
+        {
+          xcwm_rect_t *dmgRect = xcwm_window_get_damaged_rect(window);
+          DEBUG("damaged rect is %ldx%ld @ (%ld, %ld)\n", dmgRect->width, dmgRect->height, dmgRect->x, dmgRect->y);
+
+          CheckForAlpha(hWnd, image);
+
+          /* Update the region asked for */
+          HDC hdcUpdate = GetDC(hWnd);
+          BitBltFromImage(image, hdcUpdate,
+                          dmgRect->x, dmgRect->y,
+                          dmgRect->width, dmgRect->height,
+                          0, 0);
+          ReleaseDC(hWnd,hdcUpdate);
+
+          // useful?
+          RECT damage;
+          damage.left = dmgRect->x;
+          damage.top = dmgRect->y;
+          damage.right = dmgRect->x + dmgRect->width;
+          damage.bottom = dmgRect->y + dmgRect->height;
+          ValidateRect(hWnd, &damage);
+
+          xcwm_image_destroy(image);
+        }
+      else
+        {
+          DEBUG("image_copy failed\n");
+        }
     }
   else
     {
       DEBUG("UpdateImage: discarding damage, no hWnd\n");
-      // Remove the damage
-      xcwm_window_remove_damage(window);
     }
+
+  // Remove the damage
+  xcwm_window_remove_damage(window);
+
+  xcwm_event_release_thread_lock();
 }
 
 /* Windows window styles */
@@ -915,25 +943,17 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
           }
         else
           {
-            /* stop xcwm processing events so it can't change
-               this damage while we are using it */
-            xcwm_event_get_thread_lock();
-
-            xcwm_image_t *image;
-            image = xcwm_image_copy_damaged(window);
+            /* XXX: would be more efficient if we could just ask for the part we need */
+            xcwm_image_t *image = xcwm_image_copy_full(window);
             if (image)
               {
-                xcwm_rect_t *dmgRect = xcwm_window_get_damaged_rect(window);
-                /* XXX: there's no way to be sure that the damage_rect is actually the same area as the invalidated one... */
-                DEBUG("damaged rect is %ldx%ld @ (%ld, %ld)\n", dmgRect->width, dmgRect->height, dmgRect->x, dmgRect->y);
-
                 CheckForAlpha(hWnd, image);
 
                 /* Update the region asked for */
                 BitBltFromImage(image, hdcUpdate,
-                                dmgRect->x, dmgRect->y,
-                                dmgRect->width, dmgRect->height,
-                                0, 0);
+                                ps.rcPaint.left, ps.rcPaint.top,
+                                ps.rcPaint.right - ps.rcPaint.left, ps.rcPaint.bottom - ps.rcPaint.top,
+                                ps.rcPaint.left, ps.rcPaint.top);
 
                 xcwm_image_destroy(image);
               }
@@ -941,11 +961,6 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
               {
                 DEBUG("image_copy failed\n");
               }
-
-            // Remove the damage
-            xcwm_window_remove_damage(window);
-
-            xcwm_event_release_thread_lock();
           }
 
         EndPaint(hWnd, &ps);
