@@ -1133,9 +1133,6 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     case WM_XBUTTONUP:
       return winMouseButtonsHandle(window, FALSE, HIWORD(wParam) + 5, hWnd, lParam);
-
-    case WM_MOUSEWHEEL:
-      return 0;
     }
 
   return DefWindowProc(hWnd, message, wParam, lParam);
