@@ -43,6 +43,7 @@
 
 int blur = 0;
 PFNDWMENABLEBLURBEHINDWINDOW pDwmEnableBlurBehindWindow = NULL;
+extern xcwm_context_t *context;
 
 /*
  * ValidateSizing - Ensures size request respects hints
@@ -645,6 +646,28 @@ BumpWindowPosition(HWND hWnd)
 
 static UINT_PTR g_uipMousePollingTimerID = 0;
 
+static VOID CALLBACK
+winMousePollingTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime)
+{
+  static POINT last_point;
+  POINT point;
+
+  /* Get the current position of the mouse cursor */
+  GetCursorPos(&point);
+
+  /* Translate from screen coordinates to X coordinates */
+  point.x -= GetSystemMetrics(SM_XVIRTUALSCREEN);
+  point.y -= GetSystemMetrics(SM_YVIRTUALSCREEN);
+
+  /* If the mouse pointer has moved, deliver absolute cursor position to X Server */
+  if (last_point.x != point.x || last_point.y != point.y)
+    {
+      xcwm_input_mouse_motion(context, point.x, point.y);
+      last_point.x = point.x;
+      last_point.y = point.y;
+    }
+}
+
 static void
 winStartMousePolling(void)
 {
@@ -654,9 +677,25 @@ winStartMousePolling(void)
    * mouse pointer is outside of any X window.
    */
   if (g_uipMousePollingTimerID == 0)
-    g_uipMousePollingTimerID = SetTimer(NULL,
-                                        WIN_POLLING_MOUSE_TIMER_ID,
-                                        MOUSE_POLLING_INTERVAL, NULL);
+    {
+      g_uipMousePollingTimerID = SetTimer(NULL,
+                                          WIN_POLLING_MOUSE_TIMER_ID,
+                                          MOUSE_POLLING_INTERVAL,
+                                          winMousePollingTimerProc);
+      DEBUG("started mouse polling timer, id %d\n", g_uipMousePollingTimerID);
+    }
+}
+
+static void
+winStopMousePolling(void)
+{
+  /* Kill the timer used to poll mouse position */
+  if (g_uipMousePollingTimerID != 0)
+    {
+      KillTimer(NULL, g_uipMousePollingTimerID);
+      DEBUG("stopped mouse polling timer, id %d\n", g_uipMousePollingTimerID);
+      g_uipMousePollingTimerID = 0;
+    }
 }
 
 static bool g_fButton[3] = { FALSE, FALSE, FALSE };
@@ -1044,12 +1083,7 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             s_fTracking = TRUE;
           }
 
-        /* Kill the timer used to poll mouse position */
-        if (g_uipMousePollingTimerID != 0)
-          {
-            KillTimer(NULL, WIN_POLLING_MOUSE_TIMER_ID);
-            g_uipMousePollingTimerID = 0;
-          }
+        winStopMousePolling();
 
         /* Unpack the client area mouse coordinates */
         POINT ptMouse;
@@ -1067,7 +1101,7 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     case WM_MOUSELEAVE:
         /* Mouse has left our client area */
-        /* Flag that we are no longer tracking */
+        /* Flag that we need to request WM_MOUSELEAVE again when mouse returns to client area */
         s_fTracking = FALSE;
         winStartMousePolling();
         return 0;
