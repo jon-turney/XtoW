@@ -14,4 +14,4 @@ xtow_SOURCES = \
 	winvkmap.h \
 	scancodes.h
 
-xtow_LDADD = $(XCWM_LIBS) -lgdi32 -ldwmapi
+xtow_LDADD = $(XCWM_LIBS) -lgdi32

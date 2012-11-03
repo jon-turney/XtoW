@@ -42,6 +42,7 @@
 #define WIN_HDWP_PROP "cyg_hdwp_prop"
 
 int blur = 0;
+PFNDWMENABLEBLURBEHINDWINDOW pDwmEnableBlurBehindWindow = NULL;
 
 /*
  * ValidateSizing - Ensures size request respects hints
@@ -846,8 +847,8 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 assert(image->image->scanline_pad = 32); // DIBs are always 32 bit aligned
                 assert(((int)image->image->data % 4) == 0); // ?
 
-                /* image has alpha? */
-                if (image->image->depth == 32)
+                /* image has alpha and we can do something useful with it? */
+                if ((image->image->depth == 32) && pDwmEnableBlurBehindWindow)
                   {
                     /* XXX: only do this once, for each window */
                     HRGN dummyRegion = NULL;
@@ -864,7 +865,7 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
                     // need to re-issue this on WM_DWMCOMPOSITIONCHANGED
                     DEBUG("enabling alpha, blur %s\n", blur ? "on" : "off");
-                    HRESULT rc = DwmEnableBlurBehindWindow(hWnd, &bbh);
+                    HRESULT rc = pDwmEnableBlurBehindWindow(hWnd, &bbh);
                     if (rc != S_OK)
                       fprintf(stderr, "DwmEnableBlurBehindWindow failed: %d\n", (int) GetLastError());
 

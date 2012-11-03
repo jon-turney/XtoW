@@ -79,15 +79,17 @@ static void
 help(void)
 {
   fprintf(stderr, "usage: xtow [options]\n");
-  fprintf(stderr, "-blur        use glass effect to blur the image beneath transparent areas\n");
-  fprintf(stderr, "-display dpy display to manage windows on\n");
-  fprintf(stderr, "-help\n");
+  fprintf(stderr, "--nodwm       do not use DWM, even if available\n");
+  fprintf(stderr, "--blur        use glass effect to blur the image beneath transparent areas\n");
+  fprintf(stderr, "--display dpy display to manage windows on\n");
+  fprintf(stderr, "--help\n");
   exit(0);
 }
 
 int main(int argc, char **argv)
 {
   char *screen = NULL;
+  int nodwm = 0;
 
   while (1)
     {
@@ -96,6 +98,7 @@ int main(int argc, char **argv)
           { "display", required_argument, 0, 'd' },
           { "help",    no_argument, 0, 'h' },
           { "blur",    no_argument, 0, 'b' },
+          { "nodwm",   no_argument, 0, 'n' },
           {0, 0, 0, 0 },
         };
 
@@ -113,6 +116,9 @@ int main(int argc, char **argv)
         case 'b':
           blur = 1;
           break;
+        case 'n':
+          nodwm = 1;
+          break;
         case 'h':
         default:
           help();
@@ -128,6 +134,18 @@ int main(int argc, char **argv)
   MSG msg;
   PeekMessage(&msg, NULL, 0, 0, PM_NOREMOVE);
   msgPumpThread = GetCurrentThreadId();
+
+  // Get access to DwmEnableBlurBehindWindow, if available, so we can take advantage of it
+  // on Vista and later, but still run on earlier versions of Windows
+  HMODULE hDwmApiLib = LoadLibraryEx("dwmapi.dll", NULL, 0);
+  if (hDwmApiLib)
+    pDwmEnableBlurBehindWindow = (PFNDWMENABLEBLURBEHINDWINDOW)GetProcAddress(hDwmApiLib, "DwmEnableBlurBehindWindow");
+  DEBUG("DwmEnableBlurBehindWindow %s\n", pDwmEnableBlurBehindWindow ? "found" : "not found");
+  if (nodwm)
+    {
+      DEBUG("DWM disabled by --nodwm option\n");
+      pDwmEnableBlurBehindWindow = NULL;
+    }
 
   // create the global xcwm context
   context = xcwm_context_open(screen);
@@ -153,4 +171,6 @@ int main(int argc, char **argv)
   // if we got a signal...
 
   xcwm_context_close(context);
+
+  FreeLibrary(hDwmApiLib);
 }

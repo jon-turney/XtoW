@@ -20,10 +20,15 @@
 #ifndef WNDPROC_H
 #define WNDPROC_H
 
+#include <dwmapi.h>
+
 void UpdateName(xcwm_window_t *window);
 void UpdateImage(xcwm_window_t *window);
 void winCreateWindowsWindow(xcwm_window_t *window);
 void winDestroyWindowsWindow(xcwm_window_t *window);
+
+typedef HRESULT WINAPI (*PFNDWMENABLEBLURBEHINDWINDOW)(HWND hWnd, const DWM_BLURBEHIND *pBlurBehind);
+extern PFNDWMENABLEBLURBEHINDWINDOW pDwmEnableBlurBehindWindow;
 
 extern int blur;
 
