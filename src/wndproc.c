@@ -1191,11 +1191,13 @@ winCreateWindowsWindow(xcwm_window_t *window)
      make sure the window actually ends up somewhere where it will be visible */
   if (attr->_class != XCB_WINDOW_CLASS_INPUT_ONLY)
     {
+#endif
       if ((iX < GetSystemMetrics (SM_XVIRTUALSCREEN)) || (iX > GetSystemMetrics (SM_CXVIRTUALSCREEN)))
         iX = CW_USEDEFAULT;
 
       if ((iY < GetSystemMetrics (SM_YVIRTUALSCREEN)) || (iY > GetSystemMetrics (SM_CYVIRTUALSCREEN)))
         iY = CW_USEDEFAULT;
+#if 0
     }
 #endif
 
@@ -1214,13 +1216,11 @@ winCreateWindowsWindow(xcwm_window_t *window)
       /* Default positions if none specified */
       if (!xcwm_window_is_override_redirect(window))
         {
-#if 0
-          if (!(pWin->size_hints.flags & (XCB_ICCCM_SIZE_HINT_US_POSITION | XCB_ICCCM_SIZE_HINT_P_POSITION)))
+          if (!(window->hints.flags & (XCB_ICCCM_SIZE_HINT_US_POSITION | XCB_ICCCM_SIZE_HINT_P_POSITION)))
             {
               iX = CW_USEDEFAULT;
               iY = CW_USEDEFAULT;
             }
-#endif
         }
     }
 
