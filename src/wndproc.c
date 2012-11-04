@@ -395,20 +395,20 @@ winApplyStyle(xcwm_window_t *window)
       break;
     }
 
-  if (window->hints.flags & XCB_ICCCM_SIZE_HINT_P_MAX_SIZE)
+  if (window->size_hints.flags & XCB_ICCCM_SIZE_HINT_P_MAX_SIZE)
     {
       /* Not maximizable if a maximum size is specified */
       hint &= ~HINT_MAXIMIZE;
 
-      if (window->hints.flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE)
+      if (window->size_hints.flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE)
         {
           /*
             (per EWMH Implementation Notes, section "Fixed Size windows")
             If both minimum size and maximum size are specified and are the same,
             don't bother with a resizing frame
           */
-          if ((window->hints.min_width == window->hints.max_width)
-              && (window->hints.min_height == window->hints.max_height))
+          if ((window->size_hints.min_width == window->size_hints.max_width)
+              && (window->size_hints.min_height == window->size_hints.max_height))
             hint = (hint & ~HINT_SIZEFRAME);
         }
     }
@@ -1217,7 +1217,7 @@ winCreateWindowsWindow(xcwm_window_t *window)
       /* Default positions if none specified */
       if (!xcwm_window_is_override_redirect(window))
         {
-          if (!(window->hints.flags & (XCB_ICCCM_SIZE_HINT_US_POSITION | XCB_ICCCM_SIZE_HINT_P_POSITION)))
+          if (!(window->size_hints.flags & (XCB_ICCCM_SIZE_HINT_US_POSITION | XCB_ICCCM_SIZE_HINT_P_POSITION)))
             {
               iX = CW_USEDEFAULT;
               iY = CW_USEDEFAULT;
