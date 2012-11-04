@@ -5,7 +5,7 @@ goals:
 
 * use xcb
 * not built into server
-* use native composting
+* use native composing
 
 new features
 
@@ -13,8 +13,9 @@ new features
 * we have access to a window pixmap with alpha channel, so windows are composed into native desktop
 * interleaving of native and X windows in Z-order should work correctly
 * update WM without restarting X applications or server (for faster development :-))
-* fixes punch-through?
 * separate window message pump thread, so we can update window during modal loops (e.g. resizing)
+* EWMH compliance may be limited, but at least it's been audited
+* solves the problem that minimized windows are still sensitive in the non-client area of unminimized windows they overlap ('punch-through'), as minimized windows aren't still mapped on the root window
 
 features missing compared to XWin's integrated WM
 
@@ -25,7 +26,7 @@ those that probably need libxcwm support:
 * WM_DISPLAYCHANGE should use RANDR to change the display size
 * multiple native screens should be known to XINERAMA
 * the ability to ring the bell
-* accelerate OpenGL? (requires cunning plan)
+* accelerate OpenGL? (requires cunning plan, see http://lists.x.org/archives/xorg-devel/2012-April/030244.html for a clue...)
 
 those that just need writing:
 * 'keyhook' option, so we can catch all keypress and consider if we want to process them, rather than only
@@ -40,7 +41,7 @@ getting the ones that the windows shell isn't using (e.g. Windows key, Menu key,
 
 other stuff:
 
-* libxcwm doesn't adopt any existing windows when it starts
+* libxcwm doesn't adopt any existing windows when it starts (fixed)
 * libxcwm doesn't understand about InputOnly windows (probably should just ignore them)
 * libxcwm doesn't looks at _MOTIF_WM_HINTS (maybe only hints we get from old motif applications?)
 * libxcwm assumes window properties are constant while mapped; this isn't true; for every property it looks at, it should also listen for changes to that property
@@ -61,8 +62,18 @@ native compostion notes (08/11/11):
 - SetLayeredWindowAttributes() - sets an alpha value for whole windows
 
 * XtoW needs to use libxcwm style conversion
-* Need to use RENDER rather than XCopyArea() to access image to ensure we get alpha???
 
 * Need to store bits so we can draw them for WM_PAINT without having to ask server..
 (xcwm_image_copy_full() to get the full window image, but do we need to do this on init map, or will whole window get damage?)
 (Or would using UpdatedLayeredWindow() avoid that need...)
+
+libXwinWMUtil
+* should contain at least:
+- Icon conversion
+- Cursor conversion
+- mouse event conversion
+- keyboard event conversion
+- taskbar interface
+- X region to HRGN conversion (maybe...)
+
+WM_ICON_NAME should be used for minimized windows?
