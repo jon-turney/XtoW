@@ -560,17 +560,20 @@ winApplyStyle(xcwm_window_t *window)
 /*
  * Updates the style of a HWND according to its X style properties
  */
-static void
+void
 UpdateStyle(xcwm_window_t *window)
 {
-#if 0
   HWND hWnd = xcwm_window_get_local_data(window);
+#if 0
   bool onTaskbar;
 #endif
 
   /* Determine the Window style */
   winApplyStyle(window);
 
+  /* Update window opacity */
+  BYTE bAlpha = xcwm_window_get_opacity(window) >> 24;
+  SetLayeredWindowAttributes(hWnd, RGB(0,0,0), bAlpha, LWA_ALPHA);
 
 #if 0
   /*
@@ -1294,8 +1297,6 @@ winCreateWindowsWindow(xcwm_window_t *window)
   if (attr->_class != XCB_WINDOW_CLASS_INPUT_ONLY)
 #endif
     {
-      BYTE bAlpha = xcwm_window_get_opacity(window) >> 24;
-      SetLayeredWindowAttributes(hWnd, RGB(0,0,0), bAlpha, LWA_ALPHA);
       ShowWindow(hWnd, SW_SHOWNOACTIVATE);
     }
 }
