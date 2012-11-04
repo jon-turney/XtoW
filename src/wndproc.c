@@ -701,7 +701,7 @@ winStopMousePolling(void)
 static bool g_fButton[3] = { FALSE, FALSE, FALSE };
 
 static int
-winMouseButtonsHandle(xcwm_window_t *window, bool press, int iButton, HWND hWnd, LPARAM lParam)
+winMouseButtonsHandle(xcwm_window_t *window, bool press, int iButton, HWND hWnd)
 {
   /* 3 button emulation code would go here, if we thought anyone actually needed it anymore... */
 
@@ -713,22 +713,13 @@ winMouseButtonsHandle(xcwm_window_t *window, bool press, int iButton, HWND hWnd,
     }
   else
     {
+      /* XXX: this looks like it would do the wrong thing when multiple mouse buttons are pressed and
+         only one released */
       ReleaseCapture();
       winStartMousePolling();
     }
 
-  /* XXX: this looks like it would do the wrong thing when multiple mouse buttons are pressed and
-   only one released */
-
-  /* Unpack the client area mouse coordinates */
-  POINT ptMouse;
-  ptMouse.x = GET_X_LPARAM(lParam);
-  ptMouse.y = GET_Y_LPARAM(lParam);
-
-  /* Translate from client area coordinates to X coordinates */
-  ClientToXCoord(hWnd, &ptMouse);
-
-  xcwm_input_mouse_button_event(window, ptMouse.x, ptMouse.y, iButton, press);
+  xcwm_input_mouse_button_event(window, iButton, press);
 
   return 0;
 }
@@ -1108,31 +1099,31 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     case WM_LBUTTONDBLCLK:
     case WM_LBUTTONDOWN:
-      return winMouseButtonsHandle(window, TRUE, 1, hWnd, lParam);
+      return winMouseButtonsHandle(window, TRUE, 1, hWnd);
 
     case WM_LBUTTONUP:
-      return winMouseButtonsHandle(window, FALSE, 1, hWnd, lParam);
+      return winMouseButtonsHandle(window, FALSE, 1, hWnd);
 
     case WM_MBUTTONDBLCLK:
     case WM_MBUTTONDOWN:
-      return winMouseButtonsHandle(window, TRUE, 2, hWnd, lParam);
+      return winMouseButtonsHandle(window, TRUE, 2, hWnd);
 
     case WM_MBUTTONUP:
-      return winMouseButtonsHandle(window, FALSE, 2, hWnd, lParam);
+      return winMouseButtonsHandle(window, FALSE, 2, hWnd);
 
     case WM_RBUTTONDBLCLK:
     case WM_RBUTTONDOWN:
-      return winMouseButtonsHandle(window, TRUE, 3, hWnd, lParam);
+      return winMouseButtonsHandle(window, TRUE, 3, hWnd);
 
     case WM_RBUTTONUP:
-      return winMouseButtonsHandle(window, FALSE, 3, hWnd, lParam);
+      return winMouseButtonsHandle(window, FALSE, 3, hWnd);
 
     case WM_XBUTTONDBLCLK:
     case WM_XBUTTONDOWN:
-      return winMouseButtonsHandle(window, TRUE, HIWORD(wParam) + 5, hWnd, lParam);
+      return winMouseButtonsHandle(window, TRUE, HIWORD(wParam) + 5, hWnd);
 
     case WM_XBUTTONUP:
-      return winMouseButtonsHandle(window, FALSE, HIWORD(wParam) + 5, hWnd, lParam);
+      return winMouseButtonsHandle(window, FALSE, HIWORD(wParam) + 5, hWnd);
     }
 
   return DefWindowProc(hWnd, message, wParam, lParam);
