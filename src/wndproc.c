@@ -344,6 +344,24 @@ UpdateImage(xcwm_window_t *window)
 #define HINT_SYSMENU     (1<<6)
 #define HINT_SKIPTASKBAR (1<<7)
 
+#define		MwmHintsDecorations	(1L << 1)
+
+#define		MwmDecorAll		(1L << 0)
+#define		MwmDecorBorder		(1L << 1)
+#define		MwmDecorHandle		(1L << 2)
+#define		MwmDecorTitle		(1L << 3)
+#define		MwmDecorMenu		(1L << 4)
+#define		MwmDecorMinimize	(1L << 5)
+#define		MwmDecorMaximize	(1L << 6)
+
+/* This structure only contains 3 elements... the Motif 2.0 structure
+contains 5... we only need the first 3... so that is all we will define */
+typedef struct MwmHints {
+  unsigned long flags, functions, decorations;
+} MwmHints;
+
+#define		PropMwmHintsElements	3
+
 static void
 winApplyStyle(xcwm_window_t *window)
 {
@@ -354,6 +372,8 @@ winApplyStyle(xcwm_window_t *window)
 
   if (!hWnd)
     return;
+
+  DEBUG("winApplyStyle: id 0x%08x window_type %d\n", window->window_id, window_type);
 
   switch (window_type)
     {
@@ -393,6 +413,52 @@ winApplyStyle(xcwm_window_t *window)
     case XCWM_WINDOW_TYPE_MENU:
       hint |= HINT_SKIPTASKBAR;
       break;
+    }
+
+  /* Allow explicit style specification in _MOTIF_WM_HINTS to override the semantic style specified by _NET_WM_WINDOW_TYPE */
+  static xcb_atom_t motif_wm_hints = 0;
+
+  if (!motif_wm_hints)
+    motif_wm_hints = xcwm_atom_get(window->context, "_MOTIF_WM_HINTS");
+
+  xcb_get_property_cookie_t cookie_mwm_hint = xcb_get_property(window->context->conn, FALSE, window->window_id, motif_wm_hints, motif_wm_hints, 0L, sizeof(MwmHints));
+  xcb_get_property_reply_t *reply =  xcb_get_property_reply(window->context->conn, cookie_mwm_hint, NULL);
+  if (reply)
+    {
+      int nitems = xcb_get_property_value_length(reply);
+      MwmHints *mwm_hint = xcb_get_property_value(reply);
+
+      if (mwm_hint && (nitems >= (int)sizeof(MwmHints)) && (mwm_hint->flags & MwmHintsDecorations))
+        {
+          if (!mwm_hint->decorations)
+            hint &= ~HINT_FRAME;
+          else
+            {
+              if (mwm_hint->decorations & MwmDecorAll)
+                {
+                  /*
+                    MwmDecorAll means all decorations *except* those specified by other flag
+                    bits that are set.
+                  */
+                  mwm_hint->decorations = ~(mwm_hint->decorations);
+                }
+
+              if (!(mwm_hint->decorations & MwmDecorBorder))
+                hint &= ~HINT_FRAME;
+              if (!(mwm_hint->decorations & MwmDecorHandle))
+                hint &= ~HINT_SIZEFRAME;
+              if (!(mwm_hint->decorations & MwmDecorTitle))
+                hint &= ~HINT_CAPTION;
+              if (!(mwm_hint->decorations & MwmDecorMenu))
+                hint &= ~HINT_SYSMENU;
+              if (!(mwm_hint->decorations & MwmDecorMinimize))
+                hint &= ~HINT_MINIMIZE;
+              if (!(mwm_hint->decorations & MwmDecorMaximize))
+                hint &= ~HINT_MAXIMIZE;
+            }
+        }
+
+      free(reply);
     }
 
   if (window->size_hints.flags & XCB_ICCCM_SIZE_HINT_P_MAX_SIZE)
@@ -446,7 +512,7 @@ winApplyStyle(xcwm_window_t *window)
   SetWindowLongPtr(hWnd, GWL_STYLE, style);
   SetWindowLongPtr(hWnd, GWL_EXSTYLE, exStyle);
 
-  DEBUG("winApplyHints: id 0x%08x hints 0x%08x style 0x%08x exstyle 0x%08x\n", window->window_id, hint, style, exStyle);
+  DEBUG("winApplyStyle: id 0x%08x hints 0x%08x style 0x%08x exstyle 0x%08x\n", window->window_id, hint, style, exStyle);
 
   /* Apply the updated window style, without changing it's show or activation state */
   UINT flags = SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE;
@@ -456,24 +522,6 @@ winApplyStyle(xcwm_window_t *window)
 }
 
 #if 0
-
-#define		MwmHintsDecorations	(1L << 1)
-
-#define		MwmDecorAll		(1L << 0)
-#define		MwmDecorBorder		(1L << 1)
-#define		MwmDecorHandle		(1L << 2)
-#define		MwmDecorTitle		(1L << 3)
-#define		MwmDecorMenu		(1L << 4)
-#define		MwmDecorMinimize	(1L << 5)
-#define		MwmDecorMaximize	(1L << 6)
-
-/* This structure only contains 3 elements... the Motif 2.0 structure
-contains 5... we only need the first 3... so that is all we will define */
-typedef struct MwmHints {
-    unsigned long flags, functions, decorations;
-} MwmHints;
-
-#define		PropMwmHintsElements	3
 
 /* These two are used on their own */
 #define HINT_MAX	(1L<<0)
@@ -487,7 +535,7 @@ winApplyHints(xcb_drawable_t id, HWND hWnd, HWND *zstyle)
   static xcb_atom_t dockWindow;
   static bool got_atoms = FALSE;
   unsigned long hint = 0, maxmin = 0;
-  int nitems = 0;
+
 
   xcb_get_property_reply_t *reply;
 
@@ -498,8 +546,6 @@ winApplyHints(xcb_drawable_t id, HWND hWnd, HWND *zstyle)
 
   if (!got_atoms)
     {
-      motif_wm_hints = atom_get(conn, "_MOTIF_WM_HINTS");
-      windowType = atom_get(conn, "_NET_WM_WINDOW_TYPE");
       hiddenState = atom_get(conn, "_NET_WM_STATE_HIDDEN");
       fullscreenState = atom_get(conn, "_NET_WM_STATE_FULLSCREEN");
       belowState = atom_get(conn, "_NET_WM_STATE_BELOW");
@@ -509,9 +555,6 @@ winApplyHints(xcb_drawable_t id, HWND hWnd, HWND *zstyle)
     }
 
   xcb_get_property_cookie_t cookie_wm_state = xcb_get_property(conn, FALSE, id, windowState, XCB_ATOM, 0L, INT_MAX);
-  xcb_get_property_cookie_t cookie_mwm_hint = xcb_get_property(conn, FALSE, id, motif_wm_hints, motif_wm_hints, 0L, PropMwmHintsElements);
-  xcb_get_property_cookie_t cookie_wm_window_type = xcb_get_property(conn, FALSE, id, windowType, XCB_ATOM, 0L, 1L);
-  xcb_get_property_cookie_t cookie_normal_hints = xcb_icccm_get_wm_normal_hints(conn, id);
 
   if ((reply = xcb_get_property_reply(conn, cookie_wm_state, NULL)))
     {
@@ -531,42 +574,6 @@ winApplyHints(xcb_drawable_t id, HWND hWnd, HWND *zstyle)
             *zstyle = HWND_BOTTOM;
           else if (pAtom[i] == aboveState)
             *zstyle = HWND_TOPMOST;
-        }
-
-      free(reply);
-    }
-
-  if ((reply = xcb_get_property_reply(conn, cookie_mwm_hint, NULL)))
-    {
-      nitems = xcb_get_property_value_length(reply);
-      MwmHints *mwm_hint = xcb_get_property_value(reply);
-
-      if (mwm_hint && (nitems == PropMwmHintsElements) && (mwm_hint->flags & MwmHintsDecorations))
-        {
-          if (!mwm_hint->decorations)
-            hint |= HINT_NOFRAME;
-          else if (!(mwm_hint->decorations & MwmDecorAll))
-            {
-              if (mwm_hint->decorations & MwmDecorBorder)
-                hint |= HINT_BORDER;
-              if (mwm_hint->decorations & MwmDecorHandle)
-                hint |= HINT_SIZEBOX;
-              if (mwm_hint->decorations & MwmDecorTitle)
-                hint |= HINT_CAPTION;
-              if (!(mwm_hint->decorations & MwmDecorMenu))
-                hint |= HINT_NOSYSMENU;
-              if (!(mwm_hint->decorations & MwmDecorMinimize))
-                hint |= HINT_NOMINIMIZE;
-              if (!(mwm_hint->decorations & MwmDecorMaximize))
-                hint |= HINT_NOMAXIMIZE;
-            }
-          else
-            {
-              /*
-                MwmDecorAll means all decorations *except* those specified by other flag
-                bits that are set.  Not yet implemented.
-              */
-            }
         }
 
       free(reply);
