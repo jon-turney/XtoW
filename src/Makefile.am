@@ -12,6 +12,12 @@ xtow_SOURCES = \
 	winkeybd.c \
 	winkeybd.h \
 	winvkmap.h \
-	scancodes.h
+	scancodes.h \
+	winicons.c \
+	winicons.h \
+	resource.rc
+
+.rc.o:
+	$(AM_V_GEN)$(WINDRES) --use-temp-file -i $< --input-format=rc -o $@ -O coff
 
 xtow_LDADD = $(XCWM_LIBS) -lgdi32

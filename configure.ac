@@ -19,6 +19,7 @@ CFLAGS="-std=c99 -Wall -Wextra -Wmissing-prototypes $CFLAGS"
 # check for programs
 AC_PROG_CC
 AC_PROG_INSTALL
+AC_CHECK_TOOL(WINDRES, windres)
 
 # Checks for libraries.
 PKG_CHECK_MODULES(XCWM, xcwm)

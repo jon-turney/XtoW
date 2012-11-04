@@ -33,6 +33,7 @@
 #include "debug.h"
 #include "winmessages.h"
 #include "winkeybd.h"
+#include "winicons.h"
 #include "wndproc.h"
 
 #define WINDOW_CLASS_X "xtow"
@@ -1266,14 +1267,12 @@ winCreateWindowsWindow(xcwm_window_t *window)
   /* save the HWND into the context */
   xcwm_window_set_local_data(window, hWnd);
 
-#if 0
   /* Set icons */
   HICON	hIcon;
   HICON hIconSmall;
-  winSelectIcons(pWin, &hIcon, &hIconSmall);
+  winSelectIcons(&hIcon, &hIconSmall);
   if (hIcon) SendMessage (hWnd, WM_SETICON, ICON_BIG, (LPARAM) hIcon);
   if (hIconSmall) SendMessage (hWnd, WM_SETICON, ICON_SMALL, (LPARAM) hIconSmall);
-#endif
 
   /* Change style back to popup, already placed... */
   SetWindowLongPtr(hWnd, GWL_STYLE, WS_POPUP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS);
