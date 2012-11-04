@@ -28,6 +28,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <assert.h>
+#include <limits.h>
 #include <xcwm/xcwm.h>
 
 #include "debug.h"
@@ -416,6 +417,7 @@ winApplyStyle(xcwm_window_t *window)
     }
 
   /* Allow explicit style specification in _MOTIF_WM_HINTS to override the semantic style specified by _NET_WM_WINDOW_TYPE */
+  /* XXX: we also need to get told if _MOTIF_WM_HINTS property changes */
   static xcb_atom_t motif_wm_hints = 0;
 
   if (!motif_wm_hints)
@@ -461,6 +463,40 @@ winApplyStyle(xcwm_window_t *window)
       free(reply);
     }
 
+  /* _NET_WM_WINDOW_STATE */
+  /* XXX: we also need to get told the _NET_WM_WINDOW_STATE property changes */
+  static xcb_atom_t windowState, belowState, aboveState, skiptaskbarState;
+  if (!windowState)
+    windowState = xcwm_atom_get(window->context, "_NET_WM_STATE");
+  if (!belowState)
+    belowState = xcwm_atom_get(window->context, "_NET_WM_STATE_BELOW");
+  if (!aboveState)
+    aboveState = xcwm_atom_get(window->context, "_NET_WM_STATE_ABOVE");
+  if (!skiptaskbarState)
+    skiptaskbarState = xcwm_atom_get(window->context, "_NET_WM_STATE_SKIP_TASKBAR");
+
+  xcb_get_property_cookie_t cookie_wm_state = xcb_get_property(window->context->conn, FALSE, window->window_id, windowState, XCB_ATOM, 0L, INT_MAX);
+  reply = xcb_get_property_reply(window->context->conn, cookie_wm_state, NULL);
+  if (reply)
+    {
+      int i;
+      int nitems = xcb_get_property_value_length(reply);
+      xcb_atom_t *pAtom = xcb_get_property_value(reply);
+
+      for (i = 0; i < nitems; i++)
+        {
+          if (pAtom[i] == skiptaskbarState)
+            hint |= HINT_SKIPTASKBAR;
+          if (pAtom[i] == belowState)
+            zstyle = HWND_BOTTOM;
+          else if (pAtom[i] == aboveState)
+            zstyle = HWND_TOPMOST;
+        }
+
+      free(reply);
+    }
+
+  /* We also need to check sizing hint ... */
   if (window->size_hints.flags & XCB_ICCCM_SIZE_HINT_P_MAX_SIZE)
     {
       /* Not maximizable if a maximum size is specified */
@@ -521,73 +557,6 @@ winApplyStyle(xcwm_window_t *window)
   SetWindowPos(hWnd, NULL, 0, 0, 0, 0, flags);
 }
 
-#if 0
-
-/* These two are used on their own */
-#define HINT_MAX	(1L<<0)
-#define HINT_MIN	(1L<<1)
-
-static void
-winApplyHints(xcb_drawable_t id, HWND hWnd, HWND *zstyle)
-{
-  static xcb_atom_t windowState, motif_wm_hints, windowType;
-  static xcb_atom_t hiddenState, fullscreenState, belowState, aboveState, skiptaskbarState;
-  static xcb_atom_t dockWindow;
-  static bool got_atoms = FALSE;
-  unsigned long hint = 0, maxmin = 0;
-
-
-  xcb_get_property_reply_t *reply;
-
-  if (!hWnd)
-    return;
-  if (!IsWindow(hWnd))
-    return;
-
-  if (!got_atoms)
-    {
-      hiddenState = atom_get(conn, "_NET_WM_STATE_HIDDEN");
-      fullscreenState = atom_get(conn, "_NET_WM_STATE_FULLSCREEN");
-      belowState = atom_get(conn, "_NET_WM_STATE_BELOW");
-      aboveState = atom_get(conn, "_NET_WM_STATE_ABOVE");
-      skiptaskbarState = atom_get(conn, "_NET_WM_STATE_SKIP_TASKBAR");
-      got_atoms = TRUE;
-    }
-
-  xcb_get_property_cookie_t cookie_wm_state = xcb_get_property(conn, FALSE, id, windowState, XCB_ATOM, 0L, INT_MAX);
-
-  if ((reply = xcb_get_property_reply(conn, cookie_wm_state, NULL)))
-    {
-      int i;
-      nitems = xcb_get_property_value_length(reply);
-      xcb_atom_t *pAtom = xcb_get_property_value(reply);
-
-      for (i = 0; i < nitems; i++)
-        {
-          if (pAtom[i] == skiptaskbarState)
-            hint |= HINT_SKIPTASKBAR;
-          if (pAtom[i] == hiddenState)
-            maxmin |= HINT_MIN;
-          else if (pAtom[i] == fullscreenState)
-            maxmin |= HINT_MAX;
-          if (pAtom[i] == belowState)
-            *zstyle = HWND_BOTTOM;
-          else if (pAtom[i] == aboveState)
-            *zstyle = HWND_TOPMOST;
-        }
-
-      free(reply);
-    }
-
-  /* XXX: this should only happen on initial show */
-  if (maxmin & HINT_MAX)
-    SendMessage(hWnd, WM_SYSCOMMAND, SC_MAXIMIZE, 0);
-  else if (maxmin & HINT_MIN)
-    SendMessage(hWnd, WM_SYSCOMMAND, SC_MINIMIZE, 0);
-}
-
-#endif
-
 /*
  * Updates the style of a HWND according to its X style properties
  */
@@ -601,6 +570,7 @@ UpdateStyle(xcwm_window_t *window)
 
   /* Determine the Window style */
   winApplyStyle(window);
+
 
 #if 0
   /*
