@@ -24,5 +24,6 @@ AC_PROG_INSTALL
 PKG_CHECK_MODULES(XCWM, xcwm)
 
 AC_CONFIG_FILES([Makefile
+                 man/Makefile
                  src/Makefile])
 AC_OUTPUT

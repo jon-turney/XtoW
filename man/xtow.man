@@ -1,0 +1,44 @@
+.TH xtow 1
+.SH NAME
+xtow \- An X Compositing Window Manager for Microsoft Windows
+
+.SH SYNOPSIS
+.B xtow [ options ]
+
+.SH DESCRIPTION
+\fIxtow\fP is a Compositing Window Manager for the X Window System running on Microsoft Windows.
+
+\fIxtow\fP is designed to connect to a headless X server which supports the Composite extension,
+for example, \fIXorg(1)\fP using the xf86-video-dummy driver, and will draw the contents of X windows
+from that X server into native \fIWindows\fP windows.
+
+.SH OPTIONS
+\fIxtow\fP accepts the following command line switches, \fIall\fP of which are optional:
+
+.TP 8
+.B \-display [display]
+Specifies the X server display to connect to.
+.TP 8
+.B \-nodwm
+Do not use DWM, even if available (Windows Vista or later).  per-pixel transparency will not be
+supported.
+.TP 8
+.B \-blur
+If DWM is available, use the glass effect to blur the image beneath transparent areas.
+
+.SH "WINDOW PROPERTIES"
+Partial conformance to ICCCM and EWMH standards.
+
+The widely used but non-standard _NET_WM_WINDOW_OPACITY window property sets the transparency of
+a window, with 0 being transparent and 0xffffffff being opaque.
+
+.SH "SEE ALSO"
+XWin(1).
+
+.SH BUGS
+Lots. This is a prototype for testing libXcwm at this stage.
+
+.SH AUTHORS
+xtow was written by Jon Turney.  It uses libXcwm to do most of the heavy lifting of tracking
+X windows and talking xcb to the X server, and re-uses most of the code from \fIXWin(1)\fP's
+integrated window manager for managing the native windows.
