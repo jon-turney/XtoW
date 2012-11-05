@@ -242,8 +242,8 @@ BitBltFromImage(xcwm_image_t *image, HDC hdcUpdate,
                 int nXDest, int nYDest, int nWidth, int nHeight,
                 int nXSrc, int nYSrc)
 {
-  DEBUG("drawing %dx%d @ %d,%d from %d,%d in image\n", nWidth, nHeight, nXDest,  nYDest,  nXSrc,  nYSrc);
-  DEBUG("image has bpp %d, depth %d\n", image->image->bpp, image->image->depth);
+  // DEBUG("drawing %dx%d @ %d,%d from %d,%d in image\n", nWidth, nHeight, nXDest,  nYDest,  nXSrc,  nYSrc);
+  //  DEBUG("image has bpp %d, depth %d\n", image->image->bpp, image->image->depth);
 
   assert(image->image->scanline_pad = 32); // DIBs are always 32 bit aligned
   assert(((int)image->image->data % 4) == 0); // ?
@@ -298,7 +298,7 @@ UpdateImage(xcwm_window_t *window)
       if (image)
         {
           xcwm_rect_t *dmgRect = xcwm_window_get_damaged_rect(window);
-          DEBUG("damaged rect is %ldx%ld @ (%ld, %ld)\n", dmgRect->width, dmgRect->height, dmgRect->x, dmgRect->y);
+          // DEBUG("damaged rect is %ldx%ld @ (%ld, %ld)\n", dmgRect->width, dmgRect->height, dmgRect->x, dmgRect->y);
 
           CheckForAlpha(hWnd, image);
 
@@ -334,6 +334,27 @@ UpdateImage(xcwm_window_t *window)
   xcwm_window_remove_damage(window);
 
   xcwm_event_release_thread_lock();
+}
+
+static xcb_atom_t
+atom_get(xcwm_context_t *context, const char *atomName)
+{
+  xcb_intern_atom_reply_t *atom_reply;
+  xcb_intern_atom_cookie_t atom_cookie;
+  xcb_atom_t atom = XCB_NONE;
+
+  atom_cookie = xcb_intern_atom(context->conn,
+                                0,
+                                strlen(atomName),
+                                atomName);
+  atom_reply = xcb_intern_atom_reply(context->conn,
+                                     atom_cookie,
+                                     NULL);
+  if (atom_reply) {
+    atom = atom_reply->atom;
+    free(atom_reply);
+  }
+  return atom;
 }
 
 /* Windows window styles */
@@ -421,7 +442,7 @@ winApplyStyle(xcwm_window_t *window)
   static xcb_atom_t motif_wm_hints = 0;
 
   if (!motif_wm_hints)
-    motif_wm_hints = xcwm_atom_get(window->context, "_MOTIF_WM_HINTS");
+    motif_wm_hints = atom_get(window->context, "_MOTIF_WM_HINTS");
 
   xcb_get_property_cookie_t cookie_mwm_hint = xcb_get_property(window->context->conn, FALSE, window->window_id, motif_wm_hints, motif_wm_hints, 0L, sizeof(MwmHints));
   xcb_get_property_reply_t *reply =  xcb_get_property_reply(window->context->conn, cookie_mwm_hint, NULL);
@@ -467,13 +488,13 @@ winApplyStyle(xcwm_window_t *window)
   /* XXX: we also need to get told the _NET_WM_WINDOW_STATE property changes */
   static xcb_atom_t windowState, belowState, aboveState, skiptaskbarState;
   if (!windowState)
-    windowState = xcwm_atom_get(window->context, "_NET_WM_STATE");
+    windowState = atom_get(window->context, "_NET_WM_STATE");
   if (!belowState)
-    belowState = xcwm_atom_get(window->context, "_NET_WM_STATE_BELOW");
+    belowState = atom_get(window->context, "_NET_WM_STATE_BELOW");
   if (!aboveState)
-    aboveState = xcwm_atom_get(window->context, "_NET_WM_STATE_ABOVE");
+    aboveState = atom_get(window->context, "_NET_WM_STATE_ABOVE");
   if (!skiptaskbarState)
-    skiptaskbarState = xcwm_atom_get(window->context, "_NET_WM_STATE_SKIP_TASKBAR");
+    skiptaskbarState = atom_get(window->context, "_NET_WM_STATE_SKIP_TASKBAR");
 
   xcb_get_property_cookie_t cookie_wm_state = xcb_get_property(window->context->conn, FALSE, window->window_id, windowState, XCB_ATOM, 0L, INT_MAX);
   reply = xcb_get_property_reply(window->context->conn, cookie_wm_state, NULL);
@@ -743,7 +764,7 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
   /* XXX: a global is wrong if WM_MOUSEMOVE of the new window is delivered before WM_MOUSELEAVE of the old? Use HWND instead? */
   static bool s_fTracking = FALSE;
 
-  //  winDebugWin32Message("winTopLevelWindowProc", hWnd, message, wParam, lParam);
+  // winDebugWin32Message("winTopLevelWindowProc", hWnd, message, wParam, lParam);
 
   if (message == WM_CREATE)
     {
