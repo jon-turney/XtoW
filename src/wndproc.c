@@ -278,10 +278,6 @@ BitBltFromImage(xcwm_image_t *image, HDC hdcUpdate,
 void
 UpdateImage(xcwm_window_t *window)
 {
-  HWND hWnd = xcwm_window_get_local_data(window);
-  if (!hWnd)
-    return;
-
   xcwm_rect_t *dmgRect = xcwm_window_get_damaged_rect(window);
 
   RECT damage;
@@ -290,8 +286,23 @@ UpdateImage(xcwm_window_t *window)
   damage.right = dmgRect->x + dmgRect->width;
   damage.bottom = dmgRect->y + dmgRect->height;
 
-  DEBUG("UpdateImage: invalidating %dx%d @ %d,%d on HWND 0x08%x\n", dmgRect->width, dmgRect->height, damage.left, damage.top, hWnd);
-  InvalidateRect(hWnd, &damage, FALSE);
+  /*
+    We may not have a hWnd yet, if the window is still being created when this
+     damage arrives.  Just discard the damage as we will draw the whole thing after
+     being created...
+  */
+  HWND hWnd = xcwm_window_get_local_data(window);
+  if (hWnd)
+    {
+      DEBUG("UpdateImage: invalidating %dx%d @ %d,%d on HWND 0x08%x\n", dmgRect->width, dmgRect->height, dmgRect->x, dmgRect->y, hWnd);
+      InvalidateRect(hWnd, &damage, FALSE);
+    }
+  else
+    {
+      DEBUG("UpdateImage: discarding damage, no hWnd\n");
+      // Remove the damage
+      xcwm_window_remove_damage(window);
+    }
 }
 
 /* Windows window styles */
