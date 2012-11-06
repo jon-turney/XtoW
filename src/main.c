@@ -44,7 +44,7 @@ eventHandler(const xcwm_event_t *event)
     xcwm_window_t *window = xcwm_event_get_window(event);
     xcwm_event_type_t type = xcwm_event_get_type(event);
 
-    DEBUG("event %d, window 0x%08x, XID 0x%08x\n", type, window, window->window_id);
+    //    DEBUG("event %d, window 0x%08x, XID 0x%08x\n", type, window, window->window_id);
 
     switch (type)
       {

@@ -293,13 +293,17 @@ UpdateImage(xcwm_window_t *window)
   HWND hWnd = xcwm_window_get_local_data(window);
   if (hWnd)
     {
+      xcwm_rect_t *dmgRect = xcwm_window_get_damaged_rect(window);
+      // DEBUG("damaged rect is %ldx%ld @ (%ld, %ld)\n", dmgRect->width, dmgRect->height, dmgRect->x, dmgRect->y);
+
+      if (dmgRect->width == 0 || dmgRect->height == 0) {
+        DEBUG("damaged rect has zero area, %ldx%ld\n", dmgRect->width, dmgRect->height);
+      }
+
       xcwm_image_t *image;
       image = xcwm_image_copy_damaged(window);
       if (image)
         {
-          xcwm_rect_t *dmgRect = xcwm_window_get_damaged_rect(window);
-          // DEBUG("damaged rect is %ldx%ld @ (%ld, %ld)\n", dmgRect->width, dmgRect->height, dmgRect->x, dmgRect->y);
-
           CheckForAlpha(hWnd, image);
 
           /* Update the region asked for */
@@ -672,7 +676,7 @@ winStartMousePolling(void)
                                           WIN_POLLING_MOUSE_TIMER_ID,
                                           MOUSE_POLLING_INTERVAL,
                                           winMousePollingTimerProc);
-      DEBUG("started mouse polling timer, id %d\n", g_uipMousePollingTimerID);
+      //      DEBUG("started mouse polling timer, id %d\n", g_uipMousePollingTimerID);
     }
 }
 
@@ -683,7 +687,7 @@ winStopMousePolling(void)
   if (g_uipMousePollingTimerID != 0)
     {
       KillTimer(NULL, g_uipMousePollingTimerID);
-      DEBUG("stopped mouse polling timer, id %d\n", g_uipMousePollingTimerID);
+      //      DEBUG("stopped mouse polling timer, id %d\n", g_uipMousePollingTimerID);
       g_uipMousePollingTimerID = 0;
     }
 }
