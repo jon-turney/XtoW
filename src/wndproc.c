@@ -203,6 +203,78 @@ UpdateName(xcwm_window_t *window)
     }
 }
 
+static void
+CheckForAlpha(HWND hWnd, xcwm_image_t *image)
+{
+  /* image has alpha and we can do something useful with it? */
+  if ((image->image->depth == 32) && pDwmEnableBlurBehindWindow)
+    {
+      /* XXX: only do this once, for each window */
+      HRGN dummyRegion = NULL;
+
+      /* restricting the blur effect to a dummy region means the rest is unblurred */
+      if (!blur)
+        dummyRegion = CreateRectRgn(-1, -1, 0, 0);
+
+      DWM_BLURBEHIND bbh;
+      bbh.dwFlags = DWM_BB_ENABLE | DWM_BB_BLURREGION |DWM_BB_TRANSITIONONMAXIMIZED;
+      bbh.fEnable = TRUE;
+      bbh.hRgnBlur = dummyRegion;
+      bbh.fTransitionOnMaximized = TRUE; /* What does this do ??? */
+
+      // need to re-issue this on WM_DWMCOMPOSITIONCHANGED
+      DEBUG("enabling alpha, blur %s\n", blur ? "on" : "off");
+      // This terribly-named function actually controls if DWM looks at the alpha channel of this window
+      HRESULT rc = pDwmEnableBlurBehindWindow(hWnd, &bbh);
+      if (rc != S_OK)
+        fprintf(stderr, "DwmEnableBlurBehindWindow failed: %d\n", (int) GetLastError());
+
+      if (dummyRegion)
+        DeleteObject(dummyRegion);
+    }
+}
+
+static void
+BitBltFromImage(xcwm_image_t *image, HDC hdcUpdate,
+                int nXDest, int nYDest, int nWidth, int nHeight,
+                int nXSrc, int nYSrc)
+{
+  DEBUG("drawing %dx%d @ %d,%d from %d,%d in image\n", nWidth, nHeight, nXDest,  nYDest,  nXSrc,  nYSrc);
+  DEBUG("image has bpp %d, depth %d\n", image->image->bpp, image->image->depth);
+
+  assert(image->image->scanline_pad = 32); // DIBs are always 32 bit aligned
+  assert(((int)image->image->data % 4) == 0); // ?
+
+  // describe the bitmap format we are given
+  BITMAPINFO diBmi;
+  memset(&diBmi, 0, sizeof(diBmi));
+  diBmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+  diBmi.bmiHeader.biWidth = image->width;
+  diBmi.bmiHeader.biHeight = -image->height; // top-down bitmap
+  diBmi.bmiHeader.biPlanes = 1;
+  diBmi.bmiHeader.biBitCount = image->image->bpp;
+  diBmi.bmiHeader.biCompression = BI_RGB;
+  diBmi.bmiHeader.biSizeImage = 0;
+  diBmi.bmiHeader.biClrUsed = 0;
+  diBmi.bmiHeader.biClrImportant = 0;
+  // diBmi.bmiColors unused unless biBitCount is 8 or less, or biCompression is BI_BITFIELDS, or biClrUsed is non-zero...
+
+  // create compatible DC, create a device compatible bitmap from the image, and select it into the DC
+  HDC hdcMem = CreateCompatibleDC(hdcUpdate);
+  HBITMAP hBitmap = CreateDIBitmap(hdcUpdate, &(diBmi.bmiHeader), CBM_INIT, image->image->data, &diBmi, DIB_RGB_COLORS);
+  HBITMAP hStockBitmap = SelectObject(hdcMem, hBitmap);
+
+  // transfer the bits from our compatible DC to the display
+  if (!BitBlt(hdcUpdate, nXDest, nYDest, nWidth, nHeight, hdcMem, nXSrc, nYSrc, SRCCOPY))
+    {
+      fprintf(stderr, "BitBltFromImage: BitBlt failed: 0x%08lx\n", GetLastError());
+    }
+
+  SelectObject(hdcMem, hStockBitmap);
+  DeleteObject(hBitmap);
+  DeleteDC(hdcMem);
+}
+
 void
 UpdateImage(xcwm_window_t *window)
 {
@@ -821,10 +893,14 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         PAINTSTRUCT ps;
         hdcUpdate = BeginPaint(hWnd, &ps);
 
+        DEBUG("WM_PAINT XID 0x%08x, hWnd 0x%08x\n", window->window_id, hWnd);
+        DEBUG("invalidated rect is %ldx%ld @ (%ld, %ld)\n", ps.rcPaint.right - ps.rcPaint.left, ps.rcPaint.bottom - ps.rcPaint.top, ps.rcPaint.left, ps.rcPaint.top);
+
         /* Don't do anything if the PAINTSTRUCT is bogus */
         if (ps.rcPaint.right == 0 && ps.rcPaint.bottom == 0 &&
             ps.rcPaint.left == 0 && ps.rcPaint.top == 0)
           {
+            DEBUG("empty invalidated rect\n");
           }
         else
           {
@@ -836,79 +912,28 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             image = xcwm_image_copy_damaged(window);
             if (image)
               {
-                //                xcwm_rect_t *winRect = xcwm_window_get_full_rect(window);
                 xcwm_rect_t *dmgRect = xcwm_window_get_damaged_rect(window);
-
-                // DEBUG("full_rect is %ldx%ld @ (%ld, %ld)\n", winRect->width, winRect->height, winRect->x, winRect->y);
+                /* XXX: there's no way to be sure that the damage_rect is actually the same area as the invalidated one... */
                 DEBUG("damaged rect is %ldx%ld @ (%ld, %ld)\n", dmgRect->width, dmgRect->height, dmgRect->x, dmgRect->y);
-                DEBUG("invalidated rect is %ldx%ld @ (%ld, %ld)\n", ps.rcPaint.right - ps.rcPaint.left, ps.rcPaint.bottom - ps.rcPaint.top, ps.rcPaint.left, ps.rcPaint.top);
-                DEBUG("damage image has bpp %d, depth %d\n", image->image->bpp, image->image->depth);
 
-                assert(image->image->scanline_pad = 32); // DIBs are always 32 bit aligned
-                assert(((int)image->image->data % 4) == 0); // ?
+                CheckForAlpha(hWnd, image);
 
-                /* image has alpha and we can do something useful with it? */
-                if ((image->image->depth == 32) && pDwmEnableBlurBehindWindow)
-                  {
-                    /* XXX: only do this once, for each window */
-                    HRGN dummyRegion = NULL;
+                /* Update the region asked for */
+                BitBltFromImage(image, hdcUpdate,
+                                dmgRect->x, dmgRect->y,
+                                dmgRect->width, dmgRect->height,
+                                0, 0);
 
-                    /* restricting the blur effect to a dummy region means the rest is unblurred */
-                    if (!blur)
-                      dummyRegion = CreateRectRgn(-1, -1, 0, 0);
-
-                    DWM_BLURBEHIND bbh;
-                    bbh.dwFlags = DWM_BB_ENABLE | DWM_BB_BLURREGION |DWM_BB_TRANSITIONONMAXIMIZED;
-                    bbh.fEnable = TRUE;
-                    bbh.hRgnBlur = dummyRegion;
-                    bbh.fTransitionOnMaximized = TRUE; /* What does this do ??? */
-
-                    // need to re-issue this on WM_DWMCOMPOSITIONCHANGED
-                    DEBUG("enabling alpha, blur %s\n", blur ? "on" : "off");
-                    HRESULT rc = pDwmEnableBlurBehindWindow(hWnd, &bbh);
-                    if (rc != S_OK)
-                      fprintf(stderr, "DwmEnableBlurBehindWindow failed: %d\n", (int) GetLastError());
-
-                    if (dummyRegion)
-                      DeleteObject(dummyRegion);
-                  }
-
-                // describe the bitmap format we are given
-                BITMAPINFO diBmi;
-                memset(&diBmi, 0, sizeof(diBmi));
-                diBmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-                diBmi.bmiHeader.biWidth = image->width;
-                diBmi.bmiHeader.biHeight = -image->height; // top-down bitmap
-                diBmi.bmiHeader.biPlanes = 1;
-                diBmi.bmiHeader.biBitCount = image->image->bpp;
-                diBmi.bmiHeader.biCompression = BI_RGB;
-                diBmi.bmiHeader.biSizeImage = 0; // image->image->size;
-                diBmi.bmiHeader.biClrUsed = 0;
-                diBmi.bmiHeader.biClrImportant = 0;
-                // diBmi.bmiColors unused unless biBitCount is 8 or less, or biCompression is BI_BITFIELDS, or biClrUsed is non-zero...
-
-                // create compatible DC, create a device compatible bitmap from the image, and select it into the DC
-                HDC hdcMem = CreateCompatibleDC(hdcUpdate);
-                HBITMAP hBitmap = CreateDIBitmap(hdcUpdate, &(diBmi.bmiHeader), CBM_INIT, image->image->data, &diBmi, DIB_RGB_COLORS);
-                HBITMAP hStockBitmap = SelectObject(hdcMem, hBitmap);
-
-                BITMAP b;
-                GetObject(hBitmap, sizeof(b), &b);
-                DEBUG("DDB has %d bpp\n", b.bmBitsPixel);
-
-                // transfer the bits from our compatible DC to the display
-                if (!BitBlt(hdcUpdate, dmgRect->x, dmgRect->y, dmgRect->width, dmgRect->height, hdcMem, 0, 0, SRCCOPY))
-                  {
-                    fprintf(stderr, "winTopLevelWindowProc: BitBlt failed: 0x%08lx\n", GetLastError());
-                  }
-
-                SelectObject(hdcMem, hStockBitmap);
-                DeleteObject(hBitmap);
-                DeleteDC(hdcMem);
-
-                // Remove the damage
-                xcwm_window_remove_damage(window);
+                xcwm_image_destroy(image);
               }
+            else
+              {
+                DEBUG("image_copy failed\n");
+              }
+
+            // Remove the damage
+            xcwm_window_remove_damage(window);
+
             xcwm_event_release_thread_lock();
           }
 
