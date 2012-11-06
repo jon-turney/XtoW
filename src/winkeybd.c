@@ -48,7 +48,7 @@ winTranslateKey(WPARAM wParam, LPARAM lParam)
     int iParamScanCode = LOBYTE(iParam);
     int iScanCode;
 
-    DEBUG("winTranslateKey: wParam %08x lParam %08x\n", wParam, lParam);
+    //    DEBUG("winTranslateKey: wParam %08x lParam %08x\n", wParam, lParam);
 
     /* WM_ key messages faked by Vista speech recognition (WSR) don't have a
      * scan code.
@@ -131,7 +131,7 @@ winSendKeyEvent(DWORD dwKey, bool fDown)
 
     xcwm_input_key_event(context, dwKey + MIN_KEYCODE, fDown);
 
-    DEBUG("winSendKeyEvent: dwKey: %d, fDown: %d\n", dwKey, fDown);
+    //    DEBUG("winSendKeyEvent: dwKey: %d, fDown: %d\n", dwKey, fDown);
 }
 
 /*
