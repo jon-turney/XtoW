@@ -589,29 +589,38 @@ UpdateStyle(xcwm_window_t *window)
   bool onTaskbar;
 #endif
 
-  /* Determine the Window style */
-  winApplyStyle(window);
 
+  /* override redirect windows never get any decoration */
+  if (!xcwm_window_is_override_redirect(window))
+    {
+      /* Determine the Window style */
+      winApplyStyle(window);
+
+#if 0
+      /*
+        Use the WS_EX_TOOLWINDOW style to remove window from Alt-Tab window switcher
+
+        According to MSDN, this is supposed to remove the window from the taskbar as well,
+        if we SW_HIDE before changing the style followed by SW_SHOW afterwards.
+
+        But that doesn't seem to work reliably, so also use iTaskbarList interface to
+        tell the taskbar to show or hide this window.
+      */
+      onTaskbar = GetWindowLongPtr(hWnd, GWL_EXSTYLE) & WS_EX_APPWINDOW;
+      wintaskbar(hWnd, onTaskbar);
+
+      /* Check urgency hint */
+      winApplyUrgency(pWMInfo->pDisplay, iWindow, hWnd);
+#endif
+   }
+
+  /*
+    ... but we must SetLayeredWindowAttribute() on all WS_EX_LAYERED style windows
+     to cause them to become visible
+  */
   /* Update window opacity */
   BYTE bAlpha = xcwm_window_get_opacity(window) >> 24;
   SetLayeredWindowAttributes(hWnd, RGB(0,0,0), bAlpha, LWA_ALPHA);
-
-#if 0
-  /*
-    Use the WS_EX_TOOLWINDOW style to remove window from Alt-Tab window switcher
-
-    According to MSDN, this is supposed to remove the window from the taskbar as well,
-    if we SW_HIDE before changing the style followed by SW_SHOW afterwards.
-
-    But that doesn't seem to work reliably, so also use iTaskbarList interface to
-    tell the taskbar to show or hide this window.
-  */
-  onTaskbar = GetWindowLongPtr(hWnd, GWL_EXSTYLE) & WS_EX_APPWINDOW;
-  wintaskbar(hWnd, onTaskbar);
-
-  /* Check urgency hint */
-  winApplyUrgency(pWMInfo->pDisplay, iWindow, hWnd);
-#endif
 }
 
 /* Don't allow window decoration to disappear off to top-left */
@@ -1302,14 +1311,13 @@ winCreateWindowsWindow(xcwm_window_t *window)
   else
     {
       /* override-redirect window, remains un-decorated, but put it on top of all other X windows */
-      /* zstyle = SWP_TOPMOST; */
+      SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     }
 
   /* Apply all properties which effect the window appearance or behaviour */
   UpdateName(window);
   /* UpdateIcon(); */
-  if (!xcwm_window_is_override_redirect(window))
-    UpdateStyle(window);
+  UpdateStyle(window);
 
   BumpWindowPosition(hWnd);
 
