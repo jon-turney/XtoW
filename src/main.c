@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <getopt.h>
 #include <xcwm/xcwm.h>
+#include <semaphore.h>
 
 #include "debug.h"
 #include "global.h"
@@ -32,6 +33,8 @@
 
 xcwm_context_t *context;
 DWORD msgPumpThread;
+
+static sem_t semaphore;
 
 static void
 eventHandler(const xcwm_event_t *event)
@@ -51,6 +54,7 @@ eventHandler(const xcwm_event_t *event)
           message pump in to create the window...
         */
         PostThreadMessage(msgPumpThread, WM_XCWM_CREATE, 0, (LPARAM)window);
+        sem_wait(&semaphore);
         break;
 
       case XCWM_EVENT_WINDOW_DESTROY:
@@ -58,6 +62,7 @@ eventHandler(const xcwm_event_t *event)
           Only the owner thread is allowed to destroy a window
          */
         PostThreadMessage(msgPumpThread, WM_XCWM_DESTROY, 0, (LPARAM)window);
+        sem_wait(&semaphore);
         break;
 
       case XCWM_EVENT_WINDOW_NAME:
@@ -139,6 +144,9 @@ int main(int argc, char **argv)
   PeekMessage(&msg, NULL, 0, 0, PM_NOREMOVE);
   msgPumpThread = GetCurrentThreadId();
 
+  // initialize semaphore used for synchronization
+  sem_init(&semaphore, 0, 0);
+
   // Get access to DwmEnableBlurBehindWindow, if available, so we can take advantage of it
   // on Vista and later, but still run on earlier versions of Windows
   HMODULE hDwmApiLib = LoadLibraryEx("dwmapi.dll", NULL, 0);
@@ -161,9 +169,15 @@ int main(int argc, char **argv)
   while (GetMessage(&msg, NULL, 0, 0) > 0)
     {
       if (msg.message == WM_XCWM_CREATE)
-        winCreateWindowsWindow((xcwm_window_t *)msg.lParam);
+        {
+          winCreateWindowsWindow((xcwm_window_t *)msg.lParam);
+          sem_post(&semaphore);
+        }
       else if (msg.message == WM_XCWM_DESTROY)
-        winDestroyWindowsWindow((xcwm_window_t *)msg.lParam);
+        {
+          winDestroyWindowsWindow((xcwm_window_t *)msg.lParam);
+          sem_post(&semaphore);
+        }
       else
         DispatchMessage(&msg);
     }
@@ -177,4 +191,6 @@ int main(int argc, char **argv)
   xcwm_context_close(context);
 
   FreeLibrary(hDwmApiLib);
+
+  sem_destroy(&semaphore);
 }

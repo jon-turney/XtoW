@@ -836,8 +836,6 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     case WM_CLOSE:
       xcwm_window_request_close(window);
-      // XXX: RACE!!! window will become invalid when we get XCB_DESTROY_NOTIFY back from server
-      // but this wndproc may continue to touch it until we get WM_DESTROY..
       return 0;
 
     case WM_DESTROY:
