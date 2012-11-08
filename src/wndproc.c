@@ -36,6 +36,7 @@
 #include "winkeybd.h"
 #include "winicons.h"
 #include "wndproc.h"
+#include "global.h"
 
 #define WINDOW_CLASS_X "xtow"
 #define WINDOW_TITLE_X "X"
@@ -45,7 +46,6 @@
 
 int blur = 0;
 PFNDWMENABLEBLURBEHINDWINDOW pDwmEnableBlurBehindWindow = NULL;
-extern xcwm_context_t *context;
 
 /*
  * ValidateSizing - Ensures size request respects hints
@@ -438,12 +438,6 @@ winApplyStyle(xcwm_window_t *window)
     }
 
   /* Allow explicit style specification in _MOTIF_WM_HINTS to override the semantic style specified by _NET_WM_WINDOW_TYPE */
-  /* XXX: we also need to get told if _MOTIF_WM_HINTS property changes */
-  static xcb_atom_t motif_wm_hints = 0;
-
-  if (!motif_wm_hints)
-    motif_wm_hints = atom_get(window->context, "_MOTIF_WM_HINTS");
-
   xcb_get_property_cookie_t cookie_mwm_hint = xcb_get_property(window->context->conn, FALSE, window->window_id, motif_wm_hints, motif_wm_hints, 0L, sizeof(MwmHints));
   xcb_get_property_reply_t *reply =  xcb_get_property_reply(window->context->conn, cookie_mwm_hint, NULL);
   if (reply)
@@ -485,10 +479,7 @@ winApplyStyle(xcwm_window_t *window)
     }
 
   /* _NET_WM_WINDOW_STATE */
-  /* XXX: we also need to get told the _NET_WM_WINDOW_STATE property changes */
-  static xcb_atom_t windowState, belowState, aboveState, skiptaskbarState;
-  if (!windowState)
-    windowState = atom_get(window->context, "_NET_WM_STATE");
+  static xcb_atom_t belowState, aboveState, skiptaskbarState;
   if (!belowState)
     belowState = atom_get(window->context, "_NET_WM_STATE_BELOW");
   if (!aboveState)

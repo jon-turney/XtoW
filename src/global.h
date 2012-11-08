@@ -20,3 +20,6 @@
 #include <xcwm/xcwm.h>
 
 extern xcwm_context_t *context;
+
+extern xcb_atom_t motif_wm_hints;
+extern xcb_atom_t windowState;

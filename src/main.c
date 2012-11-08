@@ -32,6 +32,8 @@
 #define WM_XCWM_DESTROY (WM_USER+1)
 
 xcwm_context_t *context;
+xcb_atom_t motif_wm_hints = 0;
+xcb_atom_t windowState = 0;
 DWORD msgPumpThread;
 
 static sem_t semaphore;
@@ -161,6 +163,10 @@ int main(int argc, char **argv)
 
   // create the global xcwm context
   context = xcwm_context_open(screen);
+
+  // register interest in some atoms
+  motif_wm_hints = xcwm_atom_register(context, "_MOTIF_WM_HINTS", XCWM_EVENT_WINDOW_APPEARANCE);
+  windowState = xcwm_atom_register(context, "_NET_WM_STATE", XCWM_EVENT_WINDOW_APPEARANCE);
 
   // spawn the event loop thread, and set the callback function
   xcwm_event_start_loop(context, eventHandler);
