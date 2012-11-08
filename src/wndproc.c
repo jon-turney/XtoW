@@ -562,11 +562,28 @@ winApplyStyle(xcwm_window_t *window)
 
   DEBUG("winApplyStyle: id 0x%08x hints 0x%08x style 0x%08x exstyle 0x%08x\n", window->window_id, hint, style, exStyle);
 
-  /* Apply the updated window style, without changing it's show or activation state */
   UINT flags = SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE;
   if (zstyle == HWND_NOTOPMOST)
     flags |= SWP_NOZORDER | SWP_NOOWNERZORDER;
-  SetWindowPos(hWnd, NULL, 0, 0, 0, 0, flags);
+
+  if (!pDwmEnableBlurBehindWindow)
+    {
+      /*
+        On XP, it seems we have to do an elaborate, performance killing
+        dance when changing the style of a window with WS_EX_LAYERED set,
+        to ensure that the the windows contents are drawn in the right place...
+      */
+      ShowWindow(hWnd, SW_HIDE);
+      SetWindowLongPtr(hWnd, GWL_EXSTYLE, exStyle & ~WS_EX_LAYERED);
+      SetWindowLongPtr(hWnd, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
+      SetWindowPos(hWnd, NULL, 0, 0, 0, 0, flags);
+      ShowWindow(hWnd, SW_SHOW);
+    }
+  else
+    {
+      /* Apply the updated window style, without changing it's show or activation state */
+      SetWindowPos(hWnd, NULL, 0, 0, 0, 0, flags);
+    }
 }
 
 /*
@@ -1196,7 +1213,7 @@ winCreateWindowsWindow(xcwm_window_t *window)
   /* Make it WS_OVERLAPPED in create call since WS_POPUP doesn't support */
   /* CW_USEDEFAULT, change back to popup after creation */
   dwStyle = WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
-  dwExStyle = WS_EX_TOOLWINDOW | WS_EX_LAYERED;
+  dwExStyle = WS_EX_TOOLWINDOW;
 
   /*
     Calculate the window coordinates containing the requested client area,
@@ -1285,11 +1302,16 @@ winCreateWindowsWindow(xcwm_window_t *window)
       SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     }
 
+  /*
+    Don't turn on WS_EX_LAYERED until after we've done our WS_OVERLAPPED
+    to WS_POPUP dance to avoid rendering bugs in XP
+  */
+  SetWindowLongPtr(hWnd, GWL_EXSTYLE, dwExStyle | WS_EX_LAYERED);
+
   /* Apply all properties which effect the window appearance or behaviour */
   UpdateName(window);
   /* UpdateIcon(); */
   UpdateStyle(window);
-
 
   /* Display the window without activating it */
   ShowWindow(hWnd, SW_SHOWNOACTIVATE);
