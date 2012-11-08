@@ -1104,6 +1104,14 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     case WM_XBUTTONUP:
       return winMouseButtonsHandle(window, FALSE, HIWORD(wParam) + 5, hWnd);
+
+    case WM_SETCURSOR:
+        if (LOWORD(lParam) == HTCLIENT)
+          {
+            SetCursor(LoadCursor(NULL, IDC_ARROW));
+            return TRUE;
+          }
+        break;
     }
 
   return DefWindowProc(hWnd, message, wParam, lParam);
@@ -1127,7 +1135,7 @@ void winInitMultiWindowClass(void)
       wcx.cbWndExtra = 0;
       wcx.hInstance = GetModuleHandle(NULL);
       wcx.hIcon = NULL;
-      wcx.hCursor = 0;
+      wcx.hCursor = 0; // we explicitly set the cursor on WM_SETCURSOR
       wcx.hbrBackground = (HBRUSH) GetStockObject(WHITE_BRUSH);
       wcx.lpszMenuName = NULL;
       wcx.lpszClassName = WINDOW_CLASS_X;
