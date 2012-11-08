@@ -623,35 +623,6 @@ UpdateStyle(xcwm_window_t *window)
   SetLayeredWindowAttributes(hWnd, RGB(0,0,0), bAlpha, LWA_ALPHA);
 }
 
-/* Don't allow window decoration to disappear off to top-left */
-static void
-BumpWindowPosition(HWND hWnd)
-{
-  WINDOWINFO wi;
-  int iDx, iDy;
-
-  wi.cbSize = sizeof(WINDOWINFO);
-  GetWindowInfo(hWnd, &wi);
-
-  if (wi.rcWindow.left < GetSystemMetrics(SM_XVIRTUALSCREEN))
-    {
-      iDx = GetSystemMetrics(SM_XVIRTUALSCREEN) - wi.rcWindow.left;
-      wi.rcWindow.left += iDx;
-      wi.rcWindow.right += iDx;
-    }
-
-  if (wi.rcWindow.top < GetSystemMetrics(SM_YVIRTUALSCREEN))
-    {
-      iDy = GetSystemMetrics(SM_YVIRTUALSCREEN) - wi.rcWindow.top;
-      wi.rcWindow.top += iDy;
-      wi.rcWindow.bottom += iDy;
-    }
-
-  /* Position the Windows window */
-  SetWindowPos(hWnd, 0, wi.rcWindow.left, wi.rcWindow.top, wi.rcWindow.right - wi.rcWindow.left, wi.rcWindow.bottom - wi.rcWindow.top,
-               SWP_NOACTIVATE | SWP_NOSIZE | SWP_NOZORDER);
-}
-
 #define WIN_POLLING_MOUSE_TIMER_ID	2
 #define MOUSE_POLLING_INTERVAL		50
 
@@ -1191,24 +1162,13 @@ winCreateWindowsWindow(xcwm_window_t *window)
   iWidth = windowSize->width;
   iHeight = windowSize->height;
 
-#if 0
-  // XXX: xcwm can probably just ignore input only windows...
-  xcb_get_window_attributes_reply_t *attr;
-  attr = xcb_get_window_attributes_reply(conn, xcb_get_window_attributes(conn, pWin->id), NULL);
-
-  /* If it's an InputOutput window, and so is going to end up being made visible,
-     make sure the window actually ends up somewhere where it will be visible */
-  if (attr->_class != XCB_WINDOW_CLASS_INPUT_ONLY)
+  /* Make sure the window actually ends up somewhere where it will be visible */
+  if ((iX < GetSystemMetrics(SM_XVIRTUALSCREEN)) || (iX > GetSystemMetrics(SM_CXVIRTUALSCREEN)) ||
+      (iY < GetSystemMetrics(SM_YVIRTUALSCREEN)) || (iY > GetSystemMetrics(SM_CYVIRTUALSCREEN)))
     {
-#endif
-      if ((iX < GetSystemMetrics (SM_XVIRTUALSCREEN)) || (iX > GetSystemMetrics (SM_CXVIRTUALSCREEN)))
-        iX = CW_USEDEFAULT;
-
-      if ((iY < GetSystemMetrics (SM_YVIRTUALSCREEN)) || (iY > GetSystemMetrics (SM_CYVIRTUALSCREEN)))
-        iY = CW_USEDEFAULT;
-#if 0
+      iX = CW_USEDEFAULT; /* iX == CW_DEFAULT flags both x and y should be default */
+      iY = CW_USEDEFAULT; /* and then iY determines how the window is shown... */
     }
-#endif
 
   DEBUG("winCreateWindowsWindow: %dx%d @ %dx%d\n", iWidth, iHeight, iX, iY);
 
@@ -1220,12 +1180,13 @@ winCreateWindowsWindow(xcwm_window_t *window)
        */
       hFore = xcwm_window_get_local_data(parent);
     }
-  else
+
+  /* Default positions if none specified */
+  if (!xcwm_window_is_override_redirect(window))
     {
-      /* Default positions if none specified */
-      if (!xcwm_window_is_override_redirect(window))
+      if (!(window->size_hints.flags & (XCB_ICCCM_SIZE_HINT_US_POSITION | XCB_ICCCM_SIZE_HINT_P_POSITION)))
         {
-          if (!(window->size_hints.flags & (XCB_ICCCM_SIZE_HINT_US_POSITION | XCB_ICCCM_SIZE_HINT_P_POSITION)))
+          if ((windowSize->x == 0) && (windowSize->y == 0))
             {
               iX = CW_USEDEFAULT;
               iY = CW_USEDEFAULT;
@@ -1251,6 +1212,19 @@ winCreateWindowsWindow(xcwm_window_t *window)
   if (iX != (int)CW_USEDEFAULT) iX = rc.left;
   iHeight = rc.bottom - rc.top;
   iWidth = rc.right - rc.left;
+
+  DEBUG("winCreateWindowsWindow: %dx%d @ %dx%d\n", iWidth, iHeight, iX, iY);
+
+  /* Don't allow window decoration to disappear off to top-left */
+  if ((iX != CW_USEDEFAULT) && (iX < GetSystemMetrics(SM_XVIRTUALSCREEN)))
+    {
+      iX = GetSystemMetrics(SM_XVIRTUALSCREEN);
+    }
+
+  if ((iY != CW_USEDEFAULT) && (iY < GetSystemMetrics(SM_YVIRTUALSCREEN)))
+    {
+      iY = GetSystemMetrics(SM_YVIRTUALSCREEN);
+    }
 
   DEBUG("winCreateWindowsWindow: %dx%d @ %dx%d\n", iWidth, iHeight, iX, iY);
 
@@ -1317,15 +1291,9 @@ winCreateWindowsWindow(xcwm_window_t *window)
   /* UpdateIcon(); */
   UpdateStyle(window);
 
-  BumpWindowPosition(hWnd);
 
-#if 0
   /* Display the window without activating it */
-  if (attr->_class != XCB_WINDOW_CLASS_INPUT_ONLY)
-#endif
-    {
-      ShowWindow(hWnd, SW_SHOWNOACTIVATE);
-    }
+  ShowWindow(hWnd, SW_SHOWNOACTIVATE);
 }
 
 void
