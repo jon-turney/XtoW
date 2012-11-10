@@ -17,9 +17,16 @@
 // along with XtoW.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#ifndef DEBUG_H
+#define DEBUG_H
+
+int winError(const char *format, ...);
+
 #if 1
-int debug(const char *format, ...);
-#define DEBUG debug
+int winDebug(const char *format, ...);
+#define DEBUG winDebug
 #else
 #define DEBUG(Args...)
 #endif
+
+#endif /* DEBUG_H */

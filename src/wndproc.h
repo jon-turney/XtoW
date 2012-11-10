@@ -26,6 +26,7 @@ void UpdateName(xcwm_window_t *window);
 void UpdateImage(xcwm_window_t *window);
 void UpdateStyle(xcwm_window_t *window);
 void UpdateShape(xcwm_window_t *window);
+void UpdateIcon(xcwm_window_t *window);
 void winCreateWindowsWindow(xcwm_window_t *window);
 void winDestroyWindowsWindow(xcwm_window_t *window);
 

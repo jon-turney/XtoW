@@ -24,7 +24,7 @@
 
 #if 1
 int
-debug(const char *format, ...)
+winDebug(const char *format, ...)
 {
   int count;
   va_list ap;
@@ -35,3 +35,14 @@ debug(const char *format, ...)
   return count;
 }
 #endif
+
+int
+winError(const char *format, ...)
+{
+  int count;
+  va_list ap;
+  va_start(ap, format);
+  count = vfprintf(stderr, format, ap);
+  va_end(ap);
+  return count;
+}

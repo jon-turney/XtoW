@@ -30,6 +30,7 @@
 #include <assert.h>
 #include <limits.h>
 #include <xcwm/xcwm.h>
+#include <XWinWMUtil/icon_convert.h>
 
 #include "debug.h"
 #include "winmessages.h"
@@ -634,6 +635,38 @@ UpdateStyle(xcwm_window_t *window)
   /* Update window opacity */
   BYTE bAlpha = xcwm_window_get_opacity(window) >> 24;
   SetLayeredWindowAttributes(hWnd, RGB(0,0,0), bAlpha, LWA_ALPHA);
+}
+
+void
+UpdateIcon(xcwm_window_t *window)
+{
+  HWND hWnd = xcwm_window_get_local_data(window);
+  HICON hIcon, hIconSmall, hIconOld;
+
+  hIcon = winXIconToHICON(xcwm_context_get_connection(xcwm_window_get_context(window)), xcwm_window_get_window_id(window), GetSystemMetrics(SM_CXICON));
+  hIconSmall = winXIconToHICON(xcwm_context_get_connection(xcwm_window_get_context(window)), xcwm_window_get_window_id(window), GetSystemMetrics(SM_CXSMICON));
+
+  /* If we got the small, but not the large one swap them */
+  if (!hIcon && hIconSmall) {
+    hIcon = hIconSmall;
+    hIconSmall = NULL;
+  }
+
+  if (hIcon)
+    {
+      /* Set the large icon */
+      hIconOld = (HICON) SendMessage(hWnd, WM_SETICON, ICON_BIG, (LPARAM) hIcon);
+      /* Delete the old icon, if its not the default */
+      winDestroyIcon(hIconOld);
+    }
+
+  if (hIconSmall)
+    {
+      /* Same for the small icon */
+      hIconOld = (HICON) SendMessage(hWnd, WM_SETICON, ICON_SMALL, (LPARAM) hIconSmall);
+      /* Delete the old icon, if its not the default */
+      winDestroyIcon(hIconOld);
+    }
 }
 
 #define WIN_POLLING_MOUSE_TIMER_ID	2
@@ -1388,8 +1421,8 @@ winCreateWindowsWindow(xcwm_window_t *window)
   /* save the HWND into the context */
   xcwm_window_set_local_data(window, hWnd);
 
-  /* Set icons */
-  HICON	hIcon;
+  /* Set default icon */
+  HICON hIcon;
   HICON hIconSmall;
   winSelectIcons(&hIcon, &hIconSmall);
   if (hIcon) SendMessage (hWnd, WM_SETICON, ICON_BIG, (LPARAM) hIcon);
@@ -1437,7 +1470,7 @@ winCreateWindowsWindow(xcwm_window_t *window)
 
   /* Apply all properties which effect the window appearance or behaviour */
   UpdateName(window);
-  /* UpdateIcon(); */
+  UpdateIcon(window);
   UpdateStyle(window);
   UpdateShape(window);
 
@@ -1456,11 +1489,11 @@ winDestroyWindowsWindow(xcwm_window_t *window)
   if (hWnd == NULL)
     return;
 
-#if 0
   /* Store the info we need to destroy after this window is gone */
-  hIcon = (HICON)SendMessage(pWin->hWnd, WM_GETICON, ICON_BIG, 0);
-  hIconSm = (HICON)SendMessage(pWin->hWnd, WM_GETICON, ICON_SMALL, 0);
-#endif
+  HICON hIcon;
+  HICON hIconSmall;
+  hIcon = (HICON)SendMessage(hWnd, WM_GETICON, ICON_BIG, 0);
+  hIconSmall = (HICON)SendMessage(hWnd, WM_GETICON, ICON_SMALL, 0);
 
   /* Destroy the Windows window */
   DestroyWindow(hWnd);
@@ -1468,9 +1501,7 @@ winDestroyWindowsWindow(xcwm_window_t *window)
   /* Null our handle to the Window so referencing it will cause an error */
   xcwm_window_set_local_data(window, NULL);
 
-#if 0
   /* Destroy any icons we created for this window */
   winDestroyIcon(hIcon);
-  winDestroyIcon(hIconSm);
-#endif
+  winDestroyIcon(hIconSmall);
 }

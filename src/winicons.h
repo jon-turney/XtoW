@@ -20,4 +20,10 @@
  * SOFTWARE.
  */
 
+#ifndef WINICONS_H
+#define WINICONS_H
+
 void winSelectIcons(HICON *pIcon, HICON *pSmallIcon);
+void winDestroyIcon(HICON hIcon);
+
+#endif /* WINICONS_H */

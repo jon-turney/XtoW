@@ -24,8 +24,8 @@
 #include "resource.h"
 #include "winicons.h"
 
-HICON g_hIconX = NULL;
-HICON g_hSmallIconX = NULL;
+static HICON g_hIconX = NULL;
+static HICON g_hSmallIconX = NULL;
 
 static void
 winInitGlobalIcons(void)
@@ -63,4 +63,12 @@ winSelectIcons(HICON *pIcon, HICON *pSmallIcon)
 
   if (pSmallIcon)
     *pSmallIcon = hSmallIcon;
+}
+
+void
+winDestroyIcon(HICON hIcon)
+{
+  /* Delete the icon if its not one of the application defaults */
+  if (hIcon && (hIcon != g_hIconX) && (hIcon != g_hSmallIconX))
+    DestroyIcon(hIcon);
 }

@@ -20,4 +20,4 @@ xtow_SOURCES = \
 .rc.o:
 	$(AM_V_GEN)$(WINDRES) --use-temp-file -i $< --input-format=rc -o $@ -O coff
 
-xtow_LDADD = $(XCWM_LIBS) -lgdi32
+xtow_LDADD = -lXWinWMUtil $(XCWM_LIBS) -lgdi32

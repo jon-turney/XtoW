@@ -31,10 +31,13 @@
 #define WM_XCWM_CREATE  WM_USER
 #define WM_XCWM_DESTROY (WM_USER+1)
 
+#define XCWM_EVENT_WINDOW_ICON 100
+
 xcwm_context_t *context;
 xcb_atom_t motif_wm_hints = 0;
 xcb_atom_t windowState = 0;
 DWORD msgPumpThread;
+int serverGeneration = 1;
 
 static sem_t semaphore;
 
@@ -84,6 +87,10 @@ eventHandler(const xcwm_event_t *event)
 
       case XCWM_EVENT_WINDOW_SHAPE:
         UpdateShape(window);
+        break;
+
+      case XCWM_EVENT_WINDOW_ICON:
+        UpdateIcon(window);
         break;
       }
 }
@@ -169,6 +176,8 @@ int main(int argc, char **argv)
   // register interest in some atoms
   motif_wm_hints = xcwm_atom_register(context, "_MOTIF_WM_HINTS", XCWM_EVENT_WINDOW_APPEARANCE);
   windowState = xcwm_atom_register(context, "_NET_WM_STATE", XCWM_EVENT_WINDOW_APPEARANCE);
+  xcwm_atom_register(context, " _NET_WM_ICON", XCWM_EVENT_WINDOW_ICON);
+  xcwm_atom_register(context, " WM_HINTS", XCWM_EVENT_WINDOW_ICON);
 
   // spawn the event loop thread, and set the callback function
   xcwm_event_start_loop(context, eventHandler);
