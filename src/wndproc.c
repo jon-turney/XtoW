@@ -293,7 +293,7 @@ UpdateImage(xcwm_window_t *window)
   HWND hWnd = xcwm_window_get_local_data(window);
   if (hWnd)
     {
-      xcwm_rect_t *dmgRect = xcwm_window_get_damaged_rect(window);
+      const xcwm_rect_t *dmgRect = xcwm_window_get_damaged_rect(window);
       // DEBUG("damaged rect is %ldx%ld @ (%ld, %ld)\n", dmgRect->width, dmgRect->height, dmgRect->x, dmgRect->y);
 
       if (dmgRect->width == 0 || dmgRect->height == 0) {
@@ -347,11 +347,11 @@ atom_get(xcwm_context_t *context, const char *atomName)
   xcb_intern_atom_cookie_t atom_cookie;
   xcb_atom_t atom = XCB_NONE;
 
-  atom_cookie = xcb_intern_atom(context->conn,
+  atom_cookie = xcb_intern_atom(xcwm_context_get_connection(context),
                                 0,
                                 strlen(atomName),
                                 atomName);
-  atom_reply = xcb_intern_atom_reply(context->conn,
+  atom_reply = xcb_intern_atom_reply(xcwm_context_get_connection(context),
                                      atom_cookie,
                                      NULL);
   if (atom_reply) {
@@ -399,7 +399,7 @@ winApplyStyle(xcwm_window_t *window)
   if (!hWnd)
     return;
 
-  DEBUG("winApplyStyle: id 0x%08x window_type %d\n", window->window_id, window_type);
+  DEBUG("winApplyStyle: id 0x%08x window_type %d\n", xcwm_window_get_window_id(window), window_type);
 
   switch (window_type)
     {
@@ -442,8 +442,8 @@ winApplyStyle(xcwm_window_t *window)
     }
 
   /* Allow explicit style specification in _MOTIF_WM_HINTS to override the semantic style specified by _NET_WM_WINDOW_TYPE */
-  xcb_get_property_cookie_t cookie_mwm_hint = xcb_get_property(window->context->conn, FALSE, window->window_id, motif_wm_hints, motif_wm_hints, 0L, sizeof(MwmHints));
-  xcb_get_property_reply_t *reply =  xcb_get_property_reply(window->context->conn, cookie_mwm_hint, NULL);
+  xcb_get_property_cookie_t cookie_mwm_hint = xcb_get_property(xcwm_context_get_connection(xcwm_window_get_context(window)), FALSE, xcwm_window_get_window_id(window), motif_wm_hints, motif_wm_hints, 0L, sizeof(MwmHints));
+  xcb_get_property_reply_t *reply =  xcb_get_property_reply(xcwm_context_get_connection(xcwm_window_get_context(window)), cookie_mwm_hint, NULL);
   if (reply)
     {
       int nitems = xcb_get_property_value_length(reply);
@@ -485,14 +485,14 @@ winApplyStyle(xcwm_window_t *window)
   /* _NET_WM_WINDOW_STATE */
   static xcb_atom_t belowState, aboveState, skiptaskbarState;
   if (!belowState)
-    belowState = atom_get(window->context, "_NET_WM_STATE_BELOW");
+    belowState = atom_get(xcwm_window_get_context(window), "_NET_WM_STATE_BELOW");
   if (!aboveState)
-    aboveState = atom_get(window->context, "_NET_WM_STATE_ABOVE");
+    aboveState = atom_get(xcwm_window_get_context(window), "_NET_WM_STATE_ABOVE");
   if (!skiptaskbarState)
-    skiptaskbarState = atom_get(window->context, "_NET_WM_STATE_SKIP_TASKBAR");
+    skiptaskbarState = atom_get(xcwm_window_get_context(window), "_NET_WM_STATE_SKIP_TASKBAR");
 
-  xcb_get_property_cookie_t cookie_wm_state = xcb_get_property(window->context->conn, FALSE, window->window_id, windowState, XCB_ATOM, 0L, INT_MAX);
-  reply = xcb_get_property_reply(window->context->conn, cookie_wm_state, NULL);
+  xcb_get_property_cookie_t cookie_wm_state = xcb_get_property(xcwm_context_get_connection(xcwm_window_get_context(window)), FALSE, xcwm_window_get_window_id(window), windowState, XCB_ATOM, 0L, INT_MAX);
+  reply = xcb_get_property_reply(xcwm_context_get_connection(xcwm_window_get_context(window)), cookie_wm_state, NULL);
   if (reply)
     {
       int i;
@@ -513,20 +513,21 @@ winApplyStyle(xcwm_window_t *window)
     }
 
   /* We also need to check sizing hint ... */
-  if (window->size_hints.flags & XCB_ICCCM_SIZE_HINT_P_MAX_SIZE)
+  const xcb_size_hints_t *size_hints = xcwm_window_get_sizing(window);
+  if (size_hints->flags & XCB_ICCCM_SIZE_HINT_P_MAX_SIZE)
     {
       /* Not maximizable if a maximum size is specified */
       hint &= ~HINT_MAXIMIZE;
 
-      if (window->size_hints.flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE)
+      if (size_hints->flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE)
         {
           /*
             (per EWMH Implementation Notes, section "Fixed Size windows")
             If both minimum size and maximum size are specified and are the same,
             don't bother with a resizing frame
           */
-          if ((window->size_hints.min_width == window->size_hints.max_width)
-              && (window->size_hints.min_height == window->size_hints.max_height))
+          if ((size_hints->min_width == size_hints->max_width)
+              && (size_hints->min_height == size_hints->max_height))
             hint = (hint & ~HINT_SIZEFRAME);
         }
     }
@@ -564,7 +565,7 @@ winApplyStyle(xcwm_window_t *window)
   SetWindowLongPtr(hWnd, GWL_STYLE, style);
   SetWindowLongPtr(hWnd, GWL_EXSTYLE, exStyle);
 
-  DEBUG("winApplyStyle: id 0x%08x hints 0x%08x style 0x%08x exstyle 0x%08x\n", window->window_id, hint, style, exStyle);
+  DEBUG("winApplyStyle: id 0x%08x hints 0x%08x style 0x%08x exstyle 0x%08x\n", xcwm_window_get_window_id(window), hint, style, exStyle);
 
   UINT flags = SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE;
   if (zstyle == HWND_NOTOPMOST)
@@ -763,7 +764,7 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
       /* Store the xcwm window handle and X window XID in a Windows window properties */
       xcwm_window_t *window = ((LPCREATESTRUCT)lParam)->lpCreateParams;
       SetProp(hWnd, WIN_XCWM_PROP, window);
-      SetProp(hWnd, WIN_WID_PROP, (HANDLE)window->window_id);
+      SetProp(hWnd, WIN_WID_PROP, (HANDLE)xcwm_window_get_window_id(window));
       return 0;
     }
 
@@ -783,7 +784,7 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
       /* If focus is going to another Windows app, no X window has the X input focus */
       if (!wParam)
         {
-          xcb_set_input_focus(window->context->conn, XCB_INPUT_FOCUS_NONE,
+          xcb_set_input_focus(xcwm_context_get_connection(xcwm_window_get_context(window)), XCB_INPUT_FOCUS_NONE,
                               XCB_WINDOW_NONE, XCB_CURRENT_TIME);
         }
       return 0;
@@ -808,7 +809,7 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
         /* Drop the X focus as well, but only if the Windows focus is going to another window */
         if (!wParam)
-          xcb_set_input_focus(window->context->conn, XCB_INPUT_FOCUS_NONE,
+          xcb_set_input_focus(xcwm_context_get_connection(xcwm_window_get_context(window)), XCB_INPUT_FOCUS_NONE,
                               XCB_WINDOW_NONE, XCB_CURRENT_TIME);
 
         return 0;
@@ -954,7 +955,7 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         PAINTSTRUCT ps;
         hdcUpdate = BeginPaint(hWnd, &ps);
 
-        DEBUG("WM_PAINT XID 0x%08x, hWnd 0x%08x\n", window->window_id, hWnd);
+        DEBUG("WM_PAINT XID 0x%08x, hWnd 0x%08x\n", xcwm_window_get_window_id(window), hWnd);
         DEBUG("invalidated rect is %ldx%ld @ (%ld, %ld)\n", ps.rcPaint.right - ps.rcPaint.left, ps.rcPaint.bottom - ps.rcPaint.top, ps.rcPaint.left, ps.rcPaint.top);
 
         /* Don't do anything if the PAINTSTRUCT is bogus */
@@ -1174,9 +1175,9 @@ winCreateWindowsWindow(xcwm_window_t *window)
   winInitMultiWindowClass();
   assert(xcwm_window_get_local_data(window) == NULL);
 
-  DEBUG("winCreateWindowsWindow: window 0x%08x XID 0x%08x\n", window, window->window_id);
+  DEBUG("winCreateWindowsWindow: window 0x%08x XID 0x%08x\n", window, xcwm_window_get_window_id(window));
 
-  xcwm_rect_t *windowSize = xcwm_window_get_full_rect(window);
+  const xcwm_rect_t *windowSize = xcwm_window_get_full_rect(window);
   iX = windowSize->x + GetSystemMetrics(SM_XVIRTUALSCREEN);
   iY = windowSize->y + GetSystemMetrics(SM_YVIRTUALSCREEN);
   iWidth = windowSize->width;
@@ -1204,7 +1205,8 @@ winCreateWindowsWindow(xcwm_window_t *window)
   /* Default positions if none specified */
   if (!xcwm_window_is_override_redirect(window))
     {
-      if (!(window->size_hints.flags & (XCB_ICCCM_SIZE_HINT_US_POSITION | XCB_ICCCM_SIZE_HINT_P_POSITION)))
+      const xcb_size_hints_t *size_hints = xcwm_window_get_sizing(window);
+      if (!(size_hints->flags & (XCB_ICCCM_SIZE_HINT_US_POSITION | XCB_ICCCM_SIZE_HINT_P_POSITION)))
         {
           if ((windowSize->x == 0) && (windowSize->y == 0))
             {
@@ -1324,7 +1326,7 @@ winCreateWindowsWindow(xcwm_window_t *window)
 void
 winDestroyWindowsWindow(xcwm_window_t *window)
 {
-  DEBUG("winDestroyWindowsWindow: window 0x%08x XID 0x%08x\n", window, window->window_id);
+  DEBUG("winDestroyWindowsWindow: window 0x%08x XID 0x%08x\n", window, xcwm_window_get_window_id(window));
 
   HWND hWnd = xcwm_window_get_local_data(window);
 

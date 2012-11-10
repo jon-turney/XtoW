@@ -82,8 +82,6 @@ eventHandler(const xcwm_event_t *event)
         UpdateStyle(window);
         break;
       }
-
-    free((void *)event);
 }
 
 static void
