@@ -81,6 +81,10 @@ eventHandler(const xcwm_event_t *event)
       case XCWM_EVENT_WINDOW_APPEARANCE:
         UpdateStyle(window);
         break;
+
+      case XCWM_EVENT_WINDOW_SHAPE:
+        UpdateShape(window);
+        break;
       }
 }
 

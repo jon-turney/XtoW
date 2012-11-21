@@ -663,6 +663,123 @@ winMousePollingTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime)
     }
 }
 
+/*
+ * Updates the shape of a HWND according to its X SHAPE bounding region
+*/
+void
+UpdateShape(xcwm_window_t *window)
+{
+  HRGN hRgn = NULL;
+
+  HWND hWnd = xcwm_window_get_local_data(window);
+  if (!hWnd)
+    return;
+
+  xcb_rectangle_iterator_t ri = xcwm_window_get_shape(window);
+  DEBUG("UpdateShape: %d rects\n", ri.rem);
+
+  /* If window isn't shaped, we can just use a NUL region, otherwise... */
+  if (ri.rem > 0)
+    {
+      HRGN hRgnRect;
+      RECT rcClient;
+      RECT rcWindow;
+      int iOffsetX, iOffsetY;
+
+      /* Windows region is in window, not client area, coordinates */
+
+      /* Get client rectangle */
+      if (!GetClientRect(hWnd, &rcClient)) {
+        fprintf(stderr, "UpdateShape - GetClientRect failed, bailing: %d\n",
+                (int)GetLastError());
+        return;
+      }
+
+      /* Translate client rectangle coords to screen coords */
+      /* NOTE: Only transforms top and left members */
+      ClientToScreen(hWnd, (LPPOINT) &rcClient);
+
+      /* Get window rectangle */
+      if (!GetWindowRect(hWnd, &rcWindow)) {
+        fprintf(stderr, "UpdateShape - GetWindowRect failed, bailing: %d\n",
+                (int)GetLastError());
+        return;
+      }
+
+      /* Calculate offset from window upper-left to client upper-left */
+      iOffsetX = rcClient.left - rcWindow.left;
+      iOffsetY = rcClient.top - rcWindow.top;
+      DEBUG("UpdateShape: offset to client area from window origin is (%d,%d)\n", iOffsetX, iOffsetY);
+
+      /* Start with an empty region */
+      hRgn = CreateRectRgn(0, 0, 0, 0);
+      if (hRgn == NULL) {
+        fprintf(stderr, "UpdateShape - Initial CreateRectRgn failed: %d\n",
+                (int)GetLastError());
+      }
+
+      /* Loop through all rectangles in the X region */
+      for (; ri.rem; xcb_rectangle_next(&ri))
+        {
+          /* DEBUG("UpdateShape: rect %d @ (%d,%d) %dx%d\n", ri.index, */
+          /*       ri.data->x, ri.data->y, ri.data->width, ri.data->height); */
+
+          /* Create a Windows region for the X rectangle */
+          hRgnRect = CreateRectRgn(ri.data->x + iOffsetX,
+                                   ri.data->y + iOffsetY,
+                                   ri.data->x + iOffsetX + ri.data->width,
+                                   ri.data->y + iOffsetY + ri.data->height);
+          if (hRgnRect == NULL) {
+            fprintf(stderr, "UpdateShape - CreateRectRgn failed: %d\n",
+                    (int) GetLastError());
+          }
+
+          /* Merge the Windows region with the accumulated region */
+          if (CombineRgn(hRgn, hRgn, hRgnRect, RGN_OR) == ERROR) {
+            fprintf(stderr, "UpdateShape - CombineRgn () failed: %d\n",
+                    (int) GetLastError());
+          }
+
+          /* Delete the temporary Windows region */
+          DeleteObject(hRgnRect);
+        }
+
+      /*
+        Since the X SHAPE client bounding region may extend outside the window, and is defined to be
+        clipped to X windows bounding region, we need to take the intersection of our region with the client
+        area, to ensure we get consistent appearance, otherwise the native frame may be drawn or not
+        if the X SHAPE client bounding region extends outside the X windows bounding region.
+      */
+      hRgnRect = CreateRectRgn(iOffsetX, iOffsetY, iOffsetX + rcClient.right, iOffsetY + rcClient.bottom);
+      if (hRgnRect == NULL) {
+        fprintf(stderr, "UpdateShape - Titlebar CreateRectRgn failed: %d\n",
+                (int)GetLastError());
+      }
+      if (CombineRgn(hRgn, hRgn, hRgnRect, RGN_AND) == ERROR) {
+        fprintf(stderr, "UpdateShape - CombineRgn () failed: %d\n",
+                (int) GetLastError());
+      }
+      DeleteObject(hRgnRect);
+
+      /* Now add title bar area, so that it get's drawn if window is framed */
+      /* FIXME: Mean, nasty, ugly hack!!! */
+      hRgnRect = CreateRectRgn(0, 0, rcWindow.right, iOffsetY);
+      if (hRgnRect == NULL) {
+        fprintf(stderr, "UpdateShape - Titlebar CreateRectRgn failed: %d\n",
+                (int)GetLastError());
+      }
+      if (CombineRgn(hRgn, hRgn, hRgnRect, RGN_OR) == ERROR) {
+        fprintf(stderr, "UpdateShape - CombineRgn () failed: %d\n",
+                (int) GetLastError());
+      }
+      DeleteObject(hRgnRect);
+    }
+
+  SetWindowRgn(hWnd, hRgn, TRUE);
+  /* The system now owns the region specified by the region handle and will delete
+     it when it is no longer needed. */
+}
+
 static void
 winStartMousePolling(void)
 {
@@ -1318,6 +1435,7 @@ winCreateWindowsWindow(xcwm_window_t *window)
   UpdateName(window);
   /* UpdateIcon(); */
   UpdateStyle(window);
+  UpdateShape(window);
 
   /* Display the window without activating it */
   ShowWindow(hWnd, SW_SHOWNOACTIVATE);
