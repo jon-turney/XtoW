@@ -1418,11 +1418,15 @@ winCreateWindowsWindow(xcwm_window_t *window)
           /* Set the window standard style flags */
           SetWindowLongPtr(hWnd, GWL_STYLE, (WS_POPUP | WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS) & ~WS_CAPTION & ~WS_SIZEBOX);
         }
+
+      /* place the window in front of all other non-topmost windows */
+      SetWindowPos(hWnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     }
   else
     {
       /* override-redirect window, remains un-decorated, but put it on top of all other X windows */
       SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+      /* XXX: should turn on WS_EX_TOPMOST instead? */
     }
 
   /*
