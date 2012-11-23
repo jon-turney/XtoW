@@ -20,12 +20,13 @@ new features
 features missing compared to XWin's integrated WM
 
 those that probably need libxcwm support:
-* Convert icon found in icon property to native icon for window
-* SHAPE extension support
-* Change the native cursor to the X cursor image when it's over an X window
+* Convert icon found in icon property to native icon for window (done)
+* SHAPE extension support (done)
+* Change the native cursor to the X cursor image when it's over an X window (done)
 * WM_DISPLAYCHANGE should use RANDR to change the display size
 * multiple native screens should be known to XINERAMA
 * the ability to ring the bell
+* XWarpCursor() should be able to move the native cursor (at least around and between X windows and maybe everywhere)
 * accelerate OpenGL? (requires cunning plan, see http://lists.x.org/archives/xorg-devel/2012-April/030244.html for a clue...)
 
 those that just need writing:
@@ -41,11 +42,11 @@ getting the ones that the windows shell isn't using (e.g. Windows key, Menu key,
 
 other stuff:
 
-* libxcwm doesn't adopt any existing windows when it starts (fixed)
-* libxcwm doesn't understand about InputOnly windows (probably should just ignore them)
-* libxcwm doesn't looks at _MOTIF_WM_HINTS (maybe only hints we get from old motif applications?)
-* libxcwm assumes window properties are constant while mapped; this isn't true; for every property it looks at, it should also listen for changes to that property
-* support the _NET_WM_WINDOW_OPACITY property using layered windows on XP, even if we can't use alpha
+* libxcwm doesn't adopt any existing windows when it starts (done)
+* libxcwm doesn't understand about InputOnly windows (probably should just ignore them) (done)
+* libxcwm doesn't looks at _MOTIF_WM_HINTS (maybe only hints we get from old motif applications?) (dealt with in XtoW for the moment, should be pushed into libxcwm)
+* libxcwm assumes window properties are constant while mapped; this isn't true; for every property it looks at, it should also listen for changes to that property (prototype done)
+* support the _NET_WM_WINDOW_OPACITY property using layered windows on XP, even if we can't use alpha (done)
 
 * Libraryize the code which is currently copied out of the Xserver
 - Initially, make it a library in the xserver codebase, so we can share it?
