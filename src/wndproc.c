@@ -31,6 +31,7 @@
 #include <limits.h>
 #include <xcwm/xcwm.h>
 #include <XWinWMUtil/icon_convert.h>
+#include <XWinWMUtil/mouse.h>
 
 #include "debug.h"
 #include "winmessages.h"
@@ -870,6 +871,12 @@ winMouseButtonsHandle(bool press, int iButton, HWND hWnd)
   return 0;
 }
 
+void
+winMouseButtonsSendEvent(bool bPress, int iButton)
+{
+  xcwm_input_mouse_button_event(context, iButton, bPress);
+}
+
 static void
 winDebugWin32Message(const char* function, HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -907,6 +914,7 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
   static bool hasEnteredSizeMove = FALSE;
   /* XXX: a global is wrong if WM_MOUSEMOVE of the new window is delivered before WM_MOUSELEAVE of the old? Use HWND instead? */
   static bool s_fTracking = FALSE;
+  static int iTotalDeltaZ = 0;
 
   // winDebugWin32Message("winTopLevelWindowProc", hWnd, message, wParam, lParam);
 
@@ -924,6 +932,9 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
   switch (message)
     {
     case WM_ACTIVATE:
+      /* Clear any lingering wheel delta */
+      iTotalDeltaZ = 0;
+
       /* If we are being activated, acquire the input focus */
       if (LOWORD(wParam) != WA_INACTIVE)
 	{
@@ -1268,6 +1279,10 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     case WM_XBUTTONUP:
       return winMouseButtonsHandle(FALSE, HIWORD(wParam) + 5, hWnd);
+
+    case WM_MOUSEWHEEL:
+      winMouseWheel(&iTotalDeltaZ, GET_WHEEL_DELTA_WPARAM(wParam));
+      break;
 
     case WM_SETCURSOR:
         if (LOWORD(lParam) == HTCLIENT)
