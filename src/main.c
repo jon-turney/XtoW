@@ -24,6 +24,7 @@
 #include <xcwm/xcwm.h>
 #include <semaphore.h>
 
+#include "config.h"
 #include "debug.h"
 #include "global.h"
 #include "wndproc.h"
@@ -115,6 +116,13 @@ help(void)
   exit(0);
 }
 
+static void
+version(void)
+{
+  fprintf(stderr, PACKAGE " " PACKAGE_VERSION "\n");
+  exit(0);
+}
+
 int main(int argc, char **argv)
 {
   char *screen = NULL;
@@ -124,6 +132,7 @@ int main(int argc, char **argv)
     {
       static struct option long_options[] =
         {
+          { "version", no_argument, 0, 'v' },
           { "display", required_argument, 0, 'd' },
           { "help",    no_argument, 0, 'h' },
           { "blur",    no_argument, 0, 'b' },
@@ -132,7 +141,7 @@ int main(int argc, char **argv)
         };
 
       int option_index = 0;
-      int c = getopt_long_only(argc, argv, "d:h", long_options, &option_index);
+      int c = getopt_long_only(argc, argv, "d:hv", long_options, &option_index);
 
       if (c == -1)
         break;
@@ -147,6 +156,9 @@ int main(int argc, char **argv)
           break;
         case 'n':
           nodwm = 1;
+          break;
+        case 'v':
+          version();
           break;
         case 'h':
         default:
