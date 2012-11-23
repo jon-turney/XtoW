@@ -844,7 +844,7 @@ winStopMousePolling(void)
     }
 }
 
-static bool g_fButton[3] = { FALSE, FALSE, FALSE };
+static bool g_fButton[7] = { FALSE, FALSE, FALSE };
 
 static int
 winMouseButtonsHandle(bool press, int iButton, HWND hWnd)
