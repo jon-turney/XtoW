@@ -203,6 +203,33 @@ int main(int argc, char **argv)
   // spawn the event loop thread, and set the callback function
   xcwm_event_start_loop(context, eventHandler);
 
+  // set the root window cursor to left_ptr (XXX: should probably be in libxcwm)
+  // (this controls the cursor an application gets over it's windows when it doesn't set one)
+#define XC_left_ptr 68
+
+  xcb_connection_t *connection = xcwm_context_get_connection(context);
+  xcb_cursor_t cursor = xcb_generate_id(connection);
+  xcb_window_t window = xcwm_window_get_window_id(xcwm_context_get_root_window(context));
+  xcb_font_t font = xcb_generate_id(connection);
+  xcb_font_t *mask_font = &font; /* An alias to clarify */
+  int shape = XC_left_ptr;
+
+  xcb_open_font(connection, font, sizeof("cursor"), "cursor");
+
+  static const uint16_t fgred = 0, fggreen = 0, fgblue = 0;
+  static const uint16_t bgred = 0xFFFF, bggreen = 0xFFFF, bgblue = 0xFFFF;
+
+  xcb_create_glyph_cursor(connection, cursor, font, *mask_font, shape, shape + 1,
+                          fgred, fggreen, fgblue, bgred, bggreen, bgblue);
+
+  uint32_t mask = XCB_CW_CURSOR;
+  uint32_t value_list = cursor;
+  xcb_change_window_attributes(connection, window, mask, &value_list);
+
+  xcb_free_cursor(connection, cursor);
+  xcb_close_font(connection, font);
+
+  // .. and convert to native cursor
   InitCursor();
 
   // pump windows message queue
