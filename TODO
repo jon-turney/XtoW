@@ -69,11 +69,17 @@ native compostion notes (08/11/11):
 
 libXwinWMUtil
 * should contain at least:
-- Icon conversion
-- Cursor conversion
-- mouse event conversion
-- keyboard event conversion
-- taskbar interface
-- X region to HRGN conversion (maybe...)
+- [x] Icon conversion
+- [x] Cursor conversion
+- [ ] mouse event conversion
+- [ ] keyboard event conversion
+- [ ] keyboard layout mapping
+- [ ] taskbar interface
+- [ ] X region to HRGN conversion (appears to be not worthwhile)
 
 WM_ICON_NAME should be used for minimized windows?
+
+XQueryBestCursor()
+- only the DDX gets to decide the the answer given to this
+- we'd like to tell things that GetSystemMetrics(SM_C(X|Y)CURSOR) is the best size to use
+- It's not clear that anything actually uses this, though...

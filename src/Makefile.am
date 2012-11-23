@@ -15,6 +15,8 @@ xtow_SOURCES = \
 	scancodes.h \
 	winicons.c \
 	winicons.h \
+	wincursor.c \
+	wincursor.h \
 	resource.rc
 
 .rc.o:

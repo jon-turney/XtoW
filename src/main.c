@@ -27,9 +27,11 @@
 #include "debug.h"
 #include "global.h"
 #include "wndproc.h"
+#include "wincursor.h"
 
 #define WM_XCWM_CREATE  WM_USER
 #define WM_XCWM_DESTROY (WM_USER+1)
+#define WM_XCWM_CURSOR (WM_USER+2)
 
 #define XCWM_EVENT_WINDOW_ICON 100
 
@@ -91,6 +93,13 @@ eventHandler(const xcwm_event_t *event)
 
       case XCWM_EVENT_WINDOW_ICON:
         UpdateIcon(window);
+        break;
+
+      case XCWM_EVENT_CURSOR:
+        /*
+          Only the 'GUI thread' is allowed to SetCursor()
+        */
+        PostThreadMessage(msgPumpThread, WM_XCWM_CURSOR, 0, 0);
         break;
       }
 }
@@ -182,6 +191,8 @@ int main(int argc, char **argv)
   // spawn the event loop thread, and set the callback function
   xcwm_event_start_loop(context, eventHandler);
 
+  InitCursor();
+
   // pump windows message queue
   while (GetMessage(&msg, NULL, 0, 0) > 0)
     {
@@ -195,6 +206,8 @@ int main(int argc, char **argv)
           winDestroyWindowsWindow((xcwm_window_t *)msg.lParam);
           sem_post(&semaphore);
         }
+      else if (msg.message == WM_XCWM_CURSOR)
+       UpdateCursor();
       else
         DispatchMessage(&msg);
     }

@@ -38,6 +38,7 @@
 #include "winicons.h"
 #include "wndproc.h"
 #include "global.h"
+#include "wincursor.h"
 
 #define WINDOW_CLASS_X "xtow"
 #define WINDOW_TITLE_X "X"
@@ -1271,7 +1272,7 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_SETCURSOR:
         if (LOWORD(lParam) == HTCLIENT)
           {
-            SetCursor(LoadCursor(NULL, IDC_ARROW));
+            SetCursor(winGetCursor());
             return TRUE;
           }
         break;
