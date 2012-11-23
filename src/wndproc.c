@@ -847,7 +847,7 @@ winStopMousePolling(void)
 static bool g_fButton[3] = { FALSE, FALSE, FALSE };
 
 static int
-winMouseButtonsHandle(xcwm_window_t *window, bool press, int iButton, HWND hWnd)
+winMouseButtonsHandle(bool press, int iButton, HWND hWnd)
 {
   /* 3 button emulation code would go here, if we thought anyone actually needed it anymore... */
 
@@ -865,7 +865,7 @@ winMouseButtonsHandle(xcwm_window_t *window, bool press, int iButton, HWND hWnd)
       winStartMousePolling();
     }
 
-  xcwm_input_mouse_button_event(window, iButton, press);
+  xcwm_input_mouse_button_event(context, iButton, press);
 
   return 0;
 }
@@ -1243,31 +1243,31 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     case WM_LBUTTONDBLCLK:
     case WM_LBUTTONDOWN:
-      return winMouseButtonsHandle(window, TRUE, 1, hWnd);
+      return winMouseButtonsHandle(TRUE, 1, hWnd);
 
     case WM_LBUTTONUP:
-      return winMouseButtonsHandle(window, FALSE, 1, hWnd);
+      return winMouseButtonsHandle(FALSE, 1, hWnd);
 
     case WM_MBUTTONDBLCLK:
     case WM_MBUTTONDOWN:
-      return winMouseButtonsHandle(window, TRUE, 2, hWnd);
+      return winMouseButtonsHandle(TRUE, 2, hWnd);
 
     case WM_MBUTTONUP:
-      return winMouseButtonsHandle(window, FALSE, 2, hWnd);
+      return winMouseButtonsHandle(FALSE, 2, hWnd);
 
     case WM_RBUTTONDBLCLK:
     case WM_RBUTTONDOWN:
-      return winMouseButtonsHandle(window, TRUE, 3, hWnd);
+      return winMouseButtonsHandle(TRUE, 3, hWnd);
 
     case WM_RBUTTONUP:
-      return winMouseButtonsHandle(window, FALSE, 3, hWnd);
+      return winMouseButtonsHandle(FALSE, 3, hWnd);
 
     case WM_XBUTTONDBLCLK:
     case WM_XBUTTONDOWN:
-      return winMouseButtonsHandle(window, TRUE, HIWORD(wParam) + 5, hWnd);
+      return winMouseButtonsHandle(TRUE, HIWORD(wParam) + 5, hWnd);
 
     case WM_XBUTTONUP:
-      return winMouseButtonsHandle(window, FALSE, HIWORD(wParam) + 5, hWnd);
+      return winMouseButtonsHandle(FALSE, HIWORD(wParam) + 5, hWnd);
 
     case WM_SETCURSOR:
         if (LOWORD(lParam) == HTCLIENT)
