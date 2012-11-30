@@ -7,6 +7,8 @@ xtow_SOURCES = \
 	win.c \
 	debug.c \
 	debug.h \
-	winmessages.h
+	winkeybd.c \
+	winmessages.h \
+	scancodes.h
 
 xtow_LDADD = $(XCWM_LIBS) -lgdi32

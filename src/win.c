@@ -23,8 +23,10 @@
 //
 
 #include <windows.h>
+#include <windowsx.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <assert.h>
 #include <xcwm/xcwm.h>
 
 #include "debug.h"
@@ -100,6 +102,20 @@ ValidateSizing (HWND hwnd, xcwm_window_t *window,
 }
 
 /*
+  Convert coordinates pt from client area of hWnd to X server
+ */
+static void
+ClientToXCoord(HWND hWnd, POINT *pt)
+{
+  /* Translate the client area mouse coordinates to screen (virtual desktop) coordinates */
+  ClientToScreen(hWnd, pt);
+
+  /* Translate from screen coordinates to X coordinates */
+  pt->x -= GetSystemMetrics(SM_XVIRTUALSCREEN);
+  pt->y -= GetSystemMetrics(SM_YVIRTUALSCREEN);
+}
+
+/*
  * winAdjustXWindow
  *
  * Move and resize X window with respect to corresponding Windows window.
@@ -114,7 +130,7 @@ int
 winAdjustXWindow (xcwm_window_t *window, HWND hWnd)
 {
   RECT rcWin;
-  LONG x, y, w, h;
+  LONG w, h;
 
 #define WIDTH(rc) (rc.right - rc.left)
 #define HEIGHT(rc) (rc.bottom - rc.top)
@@ -134,16 +150,14 @@ winAdjustXWindow (xcwm_window_t *window, HWND hWnd)
   w = WIDTH(rcWin);
   h = HEIGHT(rcWin);
 
-  /* Get virtual desktop coordinates of top-left of client area,
-     and transform to X screen coordinates */
+  /* Transform virtual desktop coordinates of top-left of client area,
+     to X screen coordinates */
   POINT p = {0,0};
-  ClientToScreen(hWnd, &p);
-  x = p.x - GetSystemMetrics(SM_XVIRTUALSCREEN);
-  y = p.y - GetSystemMetrics(SM_YVIRTUALSCREEN);
+  ClientToXCoord(hWnd, &p);
 
-  DEBUG("ConfigureWindow to %ldx%ld @ (%ld, %ld)\n", w, h, x, y);
+  DEBUG("ConfigureWindow to %ldx%ld @ (%ld, %ld)\n", w, h, p.x, p.y);
 
-  xcwm_window_configure(window, x, y, w, h);
+  xcwm_window_configure(window, p.x, p.y, h, w);
 
  return 1;
 
@@ -198,7 +212,9 @@ UpdateImage(xcwm_window_t *window)
   damage.right = dmgRect->x + dmgRect->width;
   damage.bottom = dmgRect->y + dmgRect->height;
 
-  InvalidateRect(hWnd, &damage, TRUE);
+  DEBUG("UpdateImage: invalidating %dx%d @ %d,%d on HWND 0x08%x\n", dmgRect->width, dmgRect->height, damage.left, damage.top, hWnd);
+  // InvalidateRect(hWnd, &damage, TRUE);
+  InvalidateRect(hWnd, NULL, TRUE); // invalidate whole window for a test
 }
 
 #if 0
@@ -493,6 +509,59 @@ BumpWindowPosition(HWND hWnd)
                SWP_NOACTIVATE | SWP_NOSIZE | SWP_NOZORDER);
 }
 
+#define WIN_POLLING_MOUSE_TIMER_ID	2
+#define MOUSE_POLLING_INTERVAL		50
+
+static UINT_PTR g_uipMousePollingTimerID = 0;
+
+static void
+winStartMousePolling(void)
+{
+  /*
+   * Timer to poll mouse position.  This is needed to make
+   * programs like xeyes follow the mouse properly when the
+   * mouse pointer is outside of any X window.
+   */
+  if (g_uipMousePollingTimerID == 0)
+    g_uipMousePollingTimerID = SetTimer(NULL,
+                                        WIN_POLLING_MOUSE_TIMER_ID,
+                                        MOUSE_POLLING_INTERVAL, NULL);
+}
+
+static bool g_fButton[3] = { FALSE, FALSE, FALSE };
+
+int
+winMouseButtonsHandle(xcwm_window_t *window, bool press, int iButton, HWND hWnd, LPARAM lParam)
+{
+  /* 3 button emulation code would go here, if we thought anyone actually needed it anymore... */
+
+  g_fButton[iButton] = press;
+  if (press)
+    {
+      SetCapture(hWnd);
+    }
+  else
+    {
+      ReleaseCapture();
+      winStartMousePolling();
+    }
+
+  /* XXX: this looks like it would do the wrong thing when multiple mouse buttons are pressed and
+   only one released */
+
+  /* Unpack the client area mouse coordinates */
+  POINT ptMouse;
+  ptMouse.x = GET_X_LPARAM(lParam);
+  ptMouse.y = GET_Y_LPARAM(lParam);
+
+  /* Translate from client area coordinates to X coordinates */
+  ClientToXCoord(hWnd, &ptMouse);
+
+  xcwm_input_mouse_button_event(window, ptMouse.x, ptMouse.y, iButton, press);
+
+  return 0;
+}
+
 static void
 winDebugWin32Message(const char* function, HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -528,6 +597,8 @@ LRESULT CALLBACK
 winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
   static bool hasEnteredSizeMove = FALSE;
+  /* XXX: a global is wrong if WM_MOUSEMOVE of the new window is delivered before WM_MOUSELEAVE of the old? Use HWND instead? */
+  static bool s_fTracking = FALSE;
 
   winDebugWin32Message("winTopLevelWindowProc", hWnd, message, wParam, lParam);
 
@@ -556,8 +627,35 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
       /* If focus is going to another Windows app, no X window has the X input focus */
       if (!wParam)
         {
-          xcwm_window_set_input_focus(NULL);
+          xcb_set_input_focus(window->context->conn, XCB_INPUT_FOCUS_NONE,
+                              XCB_WINDOW_NONE, XCB_CURRENT_TIME);
         }
+      return 0;
+
+    case WM_SETFOCUS:
+        {
+          /* Get the parent window for transient handling */
+          HWND hParent = GetParent(hWnd);
+
+          if (hParent && IsIconic(hParent))
+            ShowWindow(hParent, SW_RESTORE);
+        }
+
+        /* Synchronize all latching key states */
+        // winRestoreModeKeyStates();
+
+        return 0;
+
+    case WM_KILLFOCUS:
+        /* Pop any pressed keys since we are losing keyboard focus */
+        winKeybdReleaseKeys();
+
+        /* Drop the X focus as well, but only if the Windows focus is going to another window */
+        if (!wParam)
+          xcb_set_input_focus(window->context->conn, XCB_INPUT_FOCUS_NONE,
+                              XCB_WINDOW_NONE, XCB_CURRENT_TIME);
+
+        return 0;
 
     case WM_MOUSEACTIVATE:
       /* ??? override-redirect windows should not mouse-activate */
@@ -604,7 +702,10 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
       return 0;
 
     case WM_SHOWWINDOW:
-      /* ??? */
+      /* If window is shown, start mouse polling in case focus isn't on it */
+      if (wParam)
+        winStartMousePolling();
+
       break;
 
     case WM_WINDOWPOSCHANGED:
@@ -704,10 +805,7 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
           }
         else
           {
-            /* XXX: just eat it for now... */
-            ValidateRect(hWnd, &(ps.rcPaint));
-
-            /* stop xcwm processing events so it doesn't can't change
+            /* stop xcwm processing events so it can't change
                this damage while we are using it */
             xcwm_event_get_thread_lock();
 
@@ -718,7 +816,58 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 xcwm_rect_t *winRect = xcwm_window_get_full_rect(window);
                 xcwm_rect_t *dmgRect = xcwm_window_get_damaged_rect(window);
 
-                // convert xcwm_image_t to something we can draw...
+                DEBUG("full_rect is %ldx%ld @ (%ld, %ld)\n", winRect->width, winRect->height, winRect->x, winRect->y);
+                DEBUG("damaged rect is %ldx%ld @ (%ld, %ld)\n", dmgRect->width, dmgRect->height, dmgRect->x, dmgRect->y);
+                DEBUG("invalidated rect is %ldx%ld @ (%ld, %ld)\n", ps.rcPaint.right - ps.rcPaint.left, ps.rcPaint.bottom - ps.rcPaint.top, ps.rcPaint.left, ps.rcPaint.top);
+
+                assert(image->image->scanline_pad = 32); // DIBs are always 32 bit aligned
+                assert(((int)image->image->data % 4) == 0); // ?
+
+                // XXX: probably should use BITMAPV5HEADER ?
+                // describe the bitmap format we are given
+                BITMAPINFO diBmi;
+                memset(&diBmi, 0, sizeof(diBmi));
+                diBmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+                diBmi.bmiHeader.biWidth = image->width;
+                diBmi.bmiHeader.biHeight = -image->height;
+                diBmi.bmiHeader.biPlanes = 1;
+                diBmi.bmiHeader.biBitCount = image->image->bpp;
+                diBmi.bmiHeader.biCompression = BI_RGB;
+                diBmi.bmiHeader.biSizeImage = 0; // image->image->size;
+                diBmi.bmiHeader.biClrUsed = 0;
+                diBmi.bmiHeader.biClrImportant = 0;
+                // diBmi.bmiColors unused unless biBitCount is 8 or less, or biCompression is BI_BITFIELDS, or biClrUsed is non-zero...
+
+#if 0
+                int lines = SetDIBitsToDevice(hdcUpdate, dmgRect->x, dmgRect->y, dmgRect->width, dmgRect->height,
+                                              0, 0, 0, image->height, image->image->data, &diBmi, DIB_RGB_COLORS);
+#endif
+
+                int lines = StretchDIBits(hdcUpdate,
+                                          dmgRect->x, dmgRect->y, dmgRect->width, dmgRect->height,
+                                          0, 0, image->width, image->height,
+                                          image->image->data, &diBmi, DIB_RGB_COLORS, SRCCOPY);
+
+                DEBUG("returned %d\n", lines);
+                if (lines == 0)
+                  fprintf(stderr, "failed: 0x%08x\n", GetLastError());
+
+#if 0
+                // create compatible DC, create a device compatible bitmap from the image, and select it into the DC
+                HDC hdcMem = CreateCompatibleDC(hdcUpdate);
+                HBITMAP hBitmap = CreateDIBitmap(hdcMem, &(diBmi.bmiHeader), CBM_INIT, image->image->data, &diBmi, DIB_RGB_COLORS);
+                HBITMAP hStockBitmap = SelectObject(hdcMem, hBitmap);
+
+                // transfer the bits from our compatible DC to the display
+                if (!BitBlt(hdcUpdate, dmgRect->x, dmgRect->y, dmgRect->width, dmgRect->height, hdcMem, 0, 0, SRCCOPY))
+                  {
+                    fprintf(stderr, "winTopLevelWindowProc: BitBlt failed: 0x%08x\n", GetLastError());
+                  }
+
+                SelectObject(hdcMem, hStockBitmap);
+                DeleteObject(hBitmap);
+                DeleteDC(hdcMem);
+#endif
 
                 // Remove the damage
                 xcwm_window_remove_damage(window);
@@ -730,6 +879,142 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         return 0;
       }
 
+    case WM_SYSKEYDOWN:
+    case WM_KEYDOWN:
+    case WM_SYSKEYUP:
+    case WM_KEYUP:
+      {
+        bool press = (message == WM_SYSKEYDOWN) || (message == WM_KEYDOWN);
+
+        /*
+         * Don't do anything for the Windows keys, as focus will soon
+         * be returned to Windows.
+         */
+        if (wParam == VK_LWIN || wParam == VK_RWIN)
+          break;
+
+        /* Discard fake Ctrl_L events that precede AltGR on non-US keyboards */
+        if (winIsFakeCtrl_L(message, wParam, lParam))
+          return 0;
+
+        /*
+         * Discard presses generated from Windows auto-repeat
+         */
+        if (press && (lParam & (1 << 30)))
+          {
+            switch (wParam) {
+              /* ago: Pressing LControl while RControl is pressed is
+               * Indicated as repeat. Fix this!
+               */
+            case VK_CONTROL:
+            case VK_SHIFT:
+              if (winCheckKeyPressed(wParam, lParam))
+                return 0;
+              break;
+            default:
+              return 0;
+            }
+          }
+
+        /* Translate Windows key code to X scan code */
+        int iScanCode;
+        winTranslateKey(wParam, lParam, &iScanCode);
+
+        /* Ignore press repeats for CapsLock */
+        if (press && (wParam == VK_CAPITAL))
+          lParam = 1;
+
+        /* Send the key event(s) */
+        int i;
+        for (i = 0; i < LOWORD(lParam); ++i)
+          winSendKeyEvent(iScanCode, TRUE);
+
+        /* Release all pressed shift keys */
+        if (!press && (wParam == VK_SHIFT))
+          winFixShiftKeys(iScanCode);
+      }
+
+      return 0;
+
+    case WM_MOUSEMOVE:
+      {
+        /* Have we requested WM_MOUSELEAVE when mouse leaves window? */
+        if (!s_fTracking)
+          {
+            TRACKMOUSEEVENT tme;
+
+            /* Setup data structure */
+            memset(&tme, 0, sizeof(tme));
+            tme.cbSize = sizeof(tme);
+            tme.dwFlags = TME_LEAVE;
+            tme.hwndTrack = hWnd;
+
+            /* Call the tracking function */
+            if (!TrackMouseEvent(&tme))
+              fprintf(stderr, "winTopLevelWindowProc: TrackMouseEvent failed\n");
+
+            /* Flag that we are tracking now */
+            s_fTracking = TRUE;
+          }
+
+        /* Kill the timer used to poll mouse position */
+        if (g_uipMousePollingTimerID != 0)
+          {
+            KillTimer(NULL, WIN_POLLING_MOUSE_TIMER_ID);
+            g_uipMousePollingTimerID = 0;
+          }
+
+        /* Unpack the client area mouse coordinates */
+        POINT ptMouse;
+        ptMouse.x = GET_X_LPARAM(lParam);
+        ptMouse.y = GET_Y_LPARAM(lParam);
+
+        /* Translate the client area mouse coordinates to X coordinates */
+        ClientToXCoord(hWnd, &ptMouse);
+
+        /* Deliver absolute cursor position to X Server */
+        xcwm_input_mouse_motion(xcwm_window_get_context(window), ptMouse.x, ptMouse.y);
+
+        return 0;
+      }
+
+    case WM_MOUSELEAVE:
+        /* Mouse has left our client area */
+        /* Flag that we are no longer tracking */
+        s_fTracking = FALSE;
+        winStartMousePolling();
+        return 0;
+
+    case WM_LBUTTONDBLCLK:
+    case WM_LBUTTONDOWN:
+      return winMouseButtonsHandle(window, TRUE, 0, hWnd, lParam);
+
+    case WM_LBUTTONUP:
+      return winMouseButtonsHandle(window, FALSE, 0, hWnd, lParam);
+
+    case WM_MBUTTONDBLCLK:
+    case WM_MBUTTONDOWN:
+      return winMouseButtonsHandle(window, TRUE, 1, hWnd, lParam);
+
+    case WM_MBUTTONUP:
+      return winMouseButtonsHandle(window, FALSE, 1, hWnd, lParam);
+
+    case WM_RBUTTONDBLCLK:
+    case WM_RBUTTONDOWN:
+      return winMouseButtonsHandle(window, TRUE, 2, hWnd, lParam);
+
+    case WM_RBUTTONUP:
+      return winMouseButtonsHandle(window, FALSE, 2, hWnd, lParam);
+
+    case WM_XBUTTONDBLCLK:
+    case WM_XBUTTONDOWN:
+      return winMouseButtonsHandle(window, TRUE, HIWORD(wParam) + 5, hWnd, lParam);
+
+    case WM_XBUTTONUP:
+      return winMouseButtonsHandle(window, FALSE, HIWORD(wParam) + 5, hWnd, lParam);
+
+    case WM_MOUSEWHEEL:
+      return 0;
     }
 
   return DefWindowProc(hWnd, message, wParam, lParam);
@@ -909,6 +1194,10 @@ winCreateWindowsWindow(xcwm_window_t *window)
       /* override-redirect window, remains un-decorated, but put it on top of all other X windows */
       /* zstyle = SWP_TOPMOST; */
     }
+
+  /* XXX: set reasonable style, for now */
+  SetWindowLongPtr(hWnd, GWL_EXSTYLE, WS_EX_APPWINDOW);
+  SetWindowLongPtr(hWnd, GWL_STYLE, GetWindowLongPtr(hWnd, GWL_STYLE) | WS_SYSMENU | WS_BORDER | WS_CAPTION);
 
   /* Apply all properties which effect the window appearance or behaviour */
   UpdateName(window);

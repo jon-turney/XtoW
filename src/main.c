@@ -24,6 +24,13 @@
 #include <xcwm/xcwm.h>
 
 #include "debug.h"
+#include "global.h"
+
+#define WM_XCWM_CREATE  WM_USER
+#define WM_XCWM_DESTROY (WM_USER+1)
+
+xcwm_context_t *context;
+DWORD msgPumpThread;
 
 void
 eventHandler(const xcwm_event_t *event)
@@ -36,11 +43,20 @@ eventHandler(const xcwm_event_t *event)
     switch (type)
       {
       case XCWM_EVENT_WINDOW_CREATE:
-        winCreateWindowsWindow(window);
+        /*
+          Windows windows are owned by the thread they are created by,
+          and only the thread which owns the window can receive messages for it.
+          So, we must arrange for the thread which we want to run the Windows
+          message pump in to create the window...
+        */
+        PostThreadMessage(msgPumpThread, WM_XCWM_CREATE, 0, (LPARAM)window);
         break;
 
       case XCWM_EVENT_WINDOW_DESTROY:
-        winDestroyWindowsWindow(window);
+        /*
+          Only the owner thread is allowed to destroy a window
+         */
+        PostThreadMessage(msgPumpThread, WM_XCWM_DESTROY, 0, (LPARAM)window);
         break;
 
       case XCWM_EVENT_WINDOW_NAME:
@@ -102,16 +118,26 @@ int main(int argc, char **argv)
 
   DEBUG("screen is '%s'\n", screen);
 
-  xcwm_context_t *context = xcwm_context_open(screen);
+  // ensure this thread has a message queue
+  MSG msg;
+  PeekMessage(&msg, NULL, 0, 0, PM_NOREMOVE);
+  msgPumpThread = GetCurrentThreadId();
+
+  // create the global xcwm context
+  context = xcwm_context_open(screen);
 
   // spawn the event loop thread, and set the callback function
   xcwm_event_start_loop(context, eventHandler);
 
-  // Pump windows message queue
-  MSG msg;
+  // pump windows message queue
   while (GetMessage(&msg, NULL, 0, 0) > 0)
     {
-      DispatchMessage(&msg);
+      if (msg.message == WM_XCWM_CREATE)
+        winCreateWindowsWindow(msg.lParam);
+      else if (msg.message == WM_XCWM_DESTROY)
+        winDestroyWindowsWindow(msg.lParam);
+      else
+        DispatchMessage(&msg);
     }
 
   // Shutdown:
