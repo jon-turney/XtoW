@@ -10,9 +10,6 @@ xtow_SOURCES = \
 	debug.c \
 	debug.h \
 	winkeybd.c \
-	winkeybd.h \
-	winvkmap.h \
-	scancodes.h \
 	winicons.c \
 	winicons.h \
 	wincursor.c \

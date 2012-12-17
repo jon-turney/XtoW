@@ -32,10 +32,10 @@
 #include <xcwm/xcwm.h>
 #include <XWinWMUtil/icon_convert.h>
 #include <XWinWMUtil/mouse.h>
+#include <XWinWMUtil/keyboard.h>
 
 #include "debug.h"
 #include "winmessages.h"
-#include "winkeybd.h"
 #include "winicons.h"
 #include "wndproc.h"
 #include "global.h"
