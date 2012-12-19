@@ -194,6 +194,44 @@ int main(int argc, char **argv)
   // create the global xcwm context
   context = xcwm_context_open(screen);
 
+  //
+  xcb_connection_t *connection = xcwm_context_get_connection(context);
+
+  // Check that the X screen size is at least as big as the virtual desktop size
+  ///
+  // (We don't really care about this much, as our composited windows never actually
+  // get drawn onto the X screen)
+  //
+  // But, unfortunately it seems that XTEST mouse click events outside the X screen
+  // size are always delivered to the root window, so the X screen size needs to be
+  // at least as big as the virtual desktop to ensure that mouse click events are
+  // delivered correctly.
+  //
+  // Sizes should match so that X applications that look at the X screen size get
+  // useful information.
+  //
+  // XXX: ideally we would RANDR resize the X screen to the needed size...
+  {
+    const xcb_setup_t *setup = xcb_get_setup(connection);
+    xcb_screen_iterator_t iter = xcb_setup_roots_iterator(setup);
+    xcb_screen_t *screen = iter.data;
+
+    unsigned int x_width = screen->width_in_pixels;
+    unsigned int x_height = screen->height_in_pixels;
+
+    unsigned int win_width = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+    unsigned int win_height = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+
+    printf("X screen has size %d x %d\n", x_width, x_height);
+    printf("Windows virtual desktop has size %d x %d\n", win_width, win_height);
+
+    if ((x_width < win_width) || (x_height < win_height))
+      {
+        fprintf(stderr, "X screen size should match or exceed Windows virtual desktop size\n");
+        exit(0);
+    }
+  }
+
   // register interest in some atoms
   motif_wm_hints = xcwm_atom_register(context, "_MOTIF_WM_HINTS", XCWM_EVENT_WINDOW_APPEARANCE);
   windowState = xcwm_atom_register(context, "_NET_WM_STATE", XCWM_EVENT_WINDOW_APPEARANCE);
@@ -207,7 +245,6 @@ int main(int argc, char **argv)
   // (this controls the cursor an application gets over it's windows when it doesn't set one)
 #define XC_left_ptr 68
 
-  xcb_connection_t *connection = xcwm_context_get_connection(context);
   xcb_cursor_t cursor = xcb_generate_id(connection);
   xcb_window_t window = xcwm_window_get_window_id(xcwm_context_get_root_window(context));
   xcb_font_t font = xcb_generate_id(connection);
