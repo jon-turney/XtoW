@@ -47,6 +47,11 @@
 #define WIN_XCWM_PROP "cyg_xcwm_prop"
 #define WIN_HDWP_PROP "cyg_hdwp_prop"
 
+/* We can handle WM_MOUSEHWHEEL even though _WIN32_WINNT < 0x0600 */
+#ifndef WM_MOUSEHWHEEL
+#define WM_MOUSEHWHEEL 0x020E
+#endif
+
 int blur = 0;
 PFNDWMENABLEBLURBEHINDWINDOW pDwmEnableBlurBehindWindow = NULL;
 
@@ -845,7 +850,7 @@ winStopMousePolling(void)
     }
 }
 
-static bool g_fButton[7] = { FALSE, FALSE, FALSE };
+static bool g_fButton[9] = { FALSE, FALSE, FALSE };
 
 static int
 winMouseButtonsHandle(bool press, int iButton, HWND hWnd)
@@ -915,6 +920,7 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
   /* XXX: a global is wrong if WM_MOUSEMOVE of the new window is delivered before WM_MOUSELEAVE of the old? Use HWND instead? */
   static bool s_fTracking = FALSE;
   static int iTotalDeltaZ = 0;
+  static int iTotalDeltaV = 0;
 
   // winDebugWin32Message("winTopLevelWindowProc", hWnd, message, wParam, lParam);
 
@@ -934,6 +940,7 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_ACTIVATE:
       /* Clear any lingering wheel delta */
       iTotalDeltaZ = 0;
+      iTotalDeltaV = 0;
 
       /* If we are being activated, acquire the input focus */
       if (LOWORD(wParam) != WA_INACTIVE)
@@ -1275,13 +1282,17 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     case WM_XBUTTONDBLCLK:
     case WM_XBUTTONDOWN:
-      return winMouseButtonsHandle(TRUE, HIWORD(wParam) + 5, hWnd);
+      return winMouseButtonsHandle(TRUE, HIWORD(wParam) + 7, hWnd);
 
     case WM_XBUTTONUP:
-      return winMouseButtonsHandle(FALSE, HIWORD(wParam) + 5, hWnd);
+      return winMouseButtonsHandle(FALSE, HIWORD(wParam) + 7, hWnd);
 
     case WM_MOUSEWHEEL:
-      winMouseWheel(&iTotalDeltaZ, GET_WHEEL_DELTA_WPARAM(wParam));
+      winMouseWheel(&iTotalDeltaZ, GET_WHEEL_DELTA_WPARAM(wParam), 4, 5);
+      break;
+
+    case WM_MOUSEHWHEEL:
+      winMouseWheel(&iTotalDeltaV, GET_WHEEL_DELTA_WPARAM(wParam), 7, 6);
       break;
 
     case WM_SETCURSOR:
