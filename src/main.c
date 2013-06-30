@@ -193,6 +193,11 @@ int main(int argc, char **argv)
 
   // create the global xcwm context
   context = xcwm_context_open(screen);
+  if (!context)
+    {
+      fprintf(stderr, "Could not create xcwm context\n");
+      exit(0);
+    }
 
   //
   xcb_connection_t *connection = xcwm_context_get_connection(context);
