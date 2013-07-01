@@ -33,6 +33,7 @@
 #define WM_XCWM_CREATE  WM_USER
 #define WM_XCWM_DESTROY (WM_USER+1)
 #define WM_XCWM_CURSOR (WM_USER+2)
+#define WM_XCWM_EXIT (WM_USER+3)
 
 #define XCWM_EVENT_WINDOW_ICON 100
 
@@ -101,6 +102,10 @@ eventHandler(const xcwm_event_t *event)
           Only the 'GUI thread' is allowed to SetCursor()
         */
         PostThreadMessage(msgPumpThread, WM_XCWM_CURSOR, 0, 0);
+        break;
+
+      case XCWM_EVENT_EXIT:
+        PostThreadMessage(msgPumpThread, WM_XCWM_EXIT, 0, 0);
         break;
       }
 }
@@ -289,13 +294,15 @@ int main(int argc, char **argv)
         }
       else if (msg.message == WM_XCWM_CURSOR)
        UpdateCursor();
+      else if (msg.message == WM_XCWM_EXIT)
+        PostQuitMessage(0);
       else
         DispatchMessage(&msg);
     }
 
   // Shutdown:
+  // if server died, we get a error from xcb, which causes XCWM_EVENT_EXIT to be sent
   // if we got WM_QUIT, message loop exits
-  // if server died, we get a error from xcb
   // if window station is shutting down, we get WM_ENDSESSION
   // if we got a signal...
 
