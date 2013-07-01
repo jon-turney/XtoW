@@ -23,6 +23,9 @@
 #include <getopt.h>
 #include <xcwm/xcwm.h>
 #include <semaphore.h>
+#include <errno.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #include "config.h"
 #include "debug.h"
@@ -280,25 +283,49 @@ int main(int argc, char **argv)
   InitCursor();
 
   // pump windows message queue
-  while (GetMessage(&msg, NULL, 0, 0) > 0)
-    {
-      if (msg.message == WM_XCWM_CREATE)
+  // (Use select on /dev/windows rather than GetMessage() so that cygwin signals
+  // like a SIGINT sent from another process can reach us...)
+  int fdMessageQueue = open("/dev/windows", O_RDONLY);
+  while (1) {
+    fd_set fdsRead;
+    FD_ZERO(&fdsRead);
+    FD_SET(fdMessageQueue, &fdsRead);
+
+    /* Wait for Windows event */
+    if (select(fdMessageQueue + 1, &fdsRead, NULL, NULL, NULL) < 0)
+      {
+        if (errno == EINTR)
+          continue;
+
+        break;
+      }
+
+    if (FD_ISSET(fdMessageQueue, &fdsRead)) {
+      if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
         {
-          winCreateWindowsWindow((xcwm_window_t *)msg.lParam);
-          sem_post(&semaphore);
+          if (msg.message == WM_XCWM_CREATE)
+            {
+              winCreateWindowsWindow((xcwm_window_t *)msg.lParam);
+              sem_post(&semaphore);
+            }
+          else if (msg.message == WM_XCWM_DESTROY)
+            {
+              winDestroyWindowsWindow((xcwm_window_t *)msg.lParam);
+              sem_post(&semaphore);
+            }
+          else if (msg.message == WM_XCWM_CURSOR)
+            UpdateCursor();
+        else if (msg.message == WM_XCWM_EXIT)
+          PostQuitMessage(0);
+        else if (msg.message == WM_QUIT)
+          break;
+        else
+          DispatchMessage(&msg);
         }
-      else if (msg.message == WM_XCWM_DESTROY)
-        {
-          winDestroyWindowsWindow((xcwm_window_t *)msg.lParam);
-          sem_post(&semaphore);
-        }
-      else if (msg.message == WM_XCWM_CURSOR)
-       UpdateCursor();
-      else if (msg.message == WM_XCWM_EXIT)
-        PostQuitMessage(0);
-      else
-        DispatchMessage(&msg);
     }
+  }
+
+  close(fdMessageQueue);
 
   // Shutdown:
   // if server died, we get a error from xcb, which causes XCWM_EVENT_EXIT to be sent
