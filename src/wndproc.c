@@ -381,7 +381,7 @@ UpdateImage(xcwm_window_t *window)
 
       if (dmgRect->width == 0 || dmgRect->height == 0)
         {
-          DEBUG("damaged rect has zero area, %ldx%ld\n", dmgRect->width, dmgRect->height);
+          // DEBUG("damaged rect has zero area, %ldx%ld\n", dmgRect->width, dmgRect->height);
         }
       else
         {
@@ -1181,7 +1181,7 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         dwExStyle = GetWindowLongPtr(hWnd, GWL_EXSTYLE);
         dwStyle = GetWindowLongPtr(hWnd, GWL_STYLE);
 
-        DEBUG("winTopLevelWindowProc: WM_STYLECHANGING from %08x %08x\n", dwStyle, dwExStyle);
+        /* DEBUG("winTopLevelWindowProc: WM_STYLECHANGING from %08x %08x\n", dwStyle, dwExStyle); */
 
         if (wParam == (WPARAM)GWL_EXSTYLE)
           dwExStyle = newStyle;
@@ -1189,25 +1189,25 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         if (wParam == (WPARAM)GWL_STYLE)
           dwStyle = newStyle;
 
-        DEBUG("winTopLevelWindowProc: WM_STYLECHANGING to %08x %08x\n", dwStyle, dwExStyle);
+        /* DEBUG("winTopLevelWindowProc: WM_STYLECHANGING to %08x %08x\n", dwStyle, dwExStyle); */
 
         /* Get client rect in screen coordinates */
         wi.cbSize = sizeof(WINDOWINFO);
         GetWindowInfo(hWnd, &wi);
 
-        DEBUG("winTopLevelWindowProc: WM_STYLECHANGING client area {%d, %d, %d, %d}, {%d x %d}\n",
-                 wi.rcClient.left, wi.rcClient.top, wi.rcClient.right,
-                 wi.rcClient.bottom, wi.rcClient.right - wi.rcClient.left,
-                 wi.rcClient.bottom - wi.rcClient.top);
+        /* DEBUG("winTopLevelWindowProc: WM_STYLECHANGING client area {%d, %d, %d, %d}, {%d x %d}\n", */
+        /*          wi.rcClient.left, wi.rcClient.top, wi.rcClient.right, */
+        /*          wi.rcClient.bottom, wi.rcClient.right - wi.rcClient.left, */
+        /*          wi.rcClient.bottom - wi.rcClient.top); */
 
         newWinRect = wi.rcClient;
         if (!AdjustWindowRectEx(&newWinRect, dwStyle, FALSE, dwExStyle))
           DEBUG("winTopLevelWindowProc: WM_STYLECHANGING AdjustWindowRectEx failed\n");
 
-        DEBUG("winTopLevelWindowProc: WM_STYLECHANGING window area should be {%d, %d, %d, %d}, {%d x %d}\n",
-                 newWinRect.left, newWinRect.top, newWinRect.right,
-                 newWinRect.bottom, newWinRect.right - newWinRect.left,
-                 newWinRect.bottom - newWinRect.top);
+        /* DEBUG("winTopLevelWindowProc: WM_STYLECHANGING window area should be {%d, %d, %d, %d}, {%d x %d}\n", */
+        /*          newWinRect.left, newWinRect.top, newWinRect.right, */
+        /*          newWinRect.bottom, newWinRect.right - newWinRect.left, */
+        /*          newWinRect.bottom - newWinRect.top); */
 
         /*
           Style change hasn't happened yet, so we can't adjust the window size yet, as the winAdjustXWindow()
@@ -1231,7 +1231,7 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             EndDeferWindowPos(hDwp);
             RemoveProp(hWnd, WIN_HDWP_PROP);
           }
-        DEBUG("winTopLevelWindowProc: WM_STYLECHANGED done\n");
+        /* DEBUG("winTopLevelWindowProc: WM_STYLECHANGED done\n"); */
       }
       return 0;
 
@@ -1250,7 +1250,7 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         if (ps.rcPaint.right == 0 && ps.rcPaint.bottom == 0 &&
             ps.rcPaint.left == 0 && ps.rcPaint.top == 0)
           {
-            DEBUG("empty invalidated rect\n");
+            /* DEBUG("empty invalidated rect\n"); */
           }
         else
           {
