@@ -154,7 +154,7 @@ winAdjustXWindow (xcwm_window_t *window, HWND hWnd)
 
   if (IsIconic(hWnd))
     {
-      DEBUG("Immediately return because the window is iconized\n");
+      DEBUG("AdjustXWindow: XID 0x%08x, hWnd 0x%08x: window is iconized\n", xcwm_window_get_window_id(window), hWnd);
       xcwm_window_iconify(window);
       return 0;
     }
@@ -174,7 +174,7 @@ winAdjustXWindow (xcwm_window_t *window, HWND hWnd)
   POINT p = {0,0};
   ClientToXCoord(hWnd, &p);
 
-  DEBUG("ConfigureWindow to %ldx%ld @ (%ld, %ld)\n", w, h, p.x, p.y);
+  DEBUG("AdjustXWindow: XID 0x%08x, hWnd 0x%08x ConfigureWindow to %ldx%ld+%ld+%ld\n", xcwm_window_get_window_id(window), hWnd, w, h, p.x, p.y);
 
   xcwm_window_configure(window, p.x, p.y, w, h);
 
@@ -243,8 +243,7 @@ winAdjustWindowsWindow(xcwm_window_t *window)
 
   /* Check if the old rectangle and new rectangle are the same */
   if (!EqualRect(&rcNew, &rcOld)) {
-    DEBUG("Need to move\n");
-    DEBUG("MoveWindow to (%ld, %ld) - %ldx%ld\n",
+    DEBUG("AdjustWindowsWindow: XID 0x%08x, hWnd 0x%08x MoveWindow to @(%ld, %ld) %ldx%ld\n", xcwm_window_get_window_id(window), hWnd,
           rcNew.left, rcNew.top,
           rcNew.right - rcNew.left, rcNew.bottom - rcNew.top);
 
@@ -254,7 +253,7 @@ winAdjustWindowsWindow(xcwm_window_t *window)
                rcNew.right - rcNew.left, rcNew.bottom - rcNew.top, TRUE);
   }
   else {
-    DEBUG("No need to move\n");
+    DEBUG("AdjustWindowsWindow: XID 0x%08x, hWnd 0x%08x no need to move\n", xcwm_window_get_window_id(window), hWnd);
   }
 }
 
@@ -275,7 +274,7 @@ UpdateName(xcwm_window_t *window)
   char *name = xcwm_window_copy_name(window);
   if (name)
     {
-      DEBUG("UpdateName: '%s'\n", name);
+      DEBUG("UpdateName: XID 0x%08x, hWnd 0x%08x, name '%s'\n", xcwm_window_get_window_id(window), hWnd, name);
 
       /* Convert from UTF-8 to wide char */
       int iLen = MultiByteToWideChar(CP_UTF8, 0, name, -1, NULL, 0);
@@ -413,13 +412,13 @@ UpdateImage(xcwm_window_t *window)
             }
           else
             {
-              DEBUG("image_copy failed\n");
+              DEBUG("UpdateImage: image_copy failed\n");
             }
         }
     }
   else
     {
-      DEBUG("UpdateImage: discarding damage, no hWnd\n");
+      DEBUG("UpdateImage: discarding damage, no hWnd for XID %08x\n", xcwm_window_get_window_id(window));
     }
 
   // Remove the damage
@@ -487,7 +486,7 @@ winApplyStyle(xcwm_window_t *window)
   if (!hWnd)
     return;
 
-  DEBUG("winApplyStyle: id 0x%08x window_type %d\n", xcwm_window_get_window_id(window), window_type);
+  DEBUG("winApplyStyle: XID 0x%08x window_type %d\n", xcwm_window_get_window_id(window), window_type);
 
   switch (window_type)
     {
@@ -653,7 +652,7 @@ winApplyStyle(xcwm_window_t *window)
   SetWindowLongPtr(hWnd, GWL_STYLE, style);
   SetWindowLongPtr(hWnd, GWL_EXSTYLE, exStyle);
 
-  DEBUG("winApplyStyle: id 0x%08x hints 0x%08x style 0x%08x exstyle 0x%08x\n", xcwm_window_get_window_id(window), hint, style, exStyle);
+  DEBUG("winApplyStyle: XID 0x%08x hints 0x%08x style 0x%08x exstyle 0x%08x\n", xcwm_window_get_window_id(window), hint, style, exStyle);
 
   UINT flags = SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE;
   if (zstyle == HWND_NOTOPMOST)
@@ -797,7 +796,7 @@ UpdateShape(xcwm_window_t *window)
     return;
 
   xcb_rectangle_iterator_t ri = xcwm_window_get_shape(window);
-  DEBUG("UpdateShape: %d rects\n", ri.rem);
+  DEBUG("UpdateShape: XID 0x%08x, hWnd 0x%08x has %d rects\n", xcwm_window_get_window_id(window), hWnd, ri.rem);
 
   /* If window isn't shaped, we can just use a NUL region, otherwise... */
   if (ri.rem > 0)
@@ -1280,7 +1279,7 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
               }
             else
               {
-                DEBUG("image_copy failed\n");
+                DEBUG("WM_PAINT image_copy failed\n");
               }
           }
 
@@ -1481,7 +1480,7 @@ winCreateWindowsWindow(xcwm_window_t *window)
   winInitMultiWindowClass();
   assert(xcwm_window_get_local_data(window) == NULL);
 
-  DEBUG("winCreateWindowsWindow: window 0x%08x XID 0x%08x\n", window, xcwm_window_get_window_id(window));
+  DEBUG("winCreateWindowsWindow: XID 0x%08x\n", xcwm_window_get_window_id(window));
 
   const xcwm_rect_t *windowSize = xcwm_window_get_full_rect(window);
   iX = windowSize->x + GetSystemMetrics(SM_XVIRTUALSCREEN);
@@ -1636,7 +1635,7 @@ winCreateWindowsWindow(xcwm_window_t *window)
 void
 winDestroyWindowsWindow(xcwm_window_t *window)
 {
-  DEBUG("winDestroyWindowsWindow: window 0x%08x XID 0x%08x\n", window, xcwm_window_get_window_id(window));
+  DEBUG("winDestroyWindowsWindow: XID 0x%08x\n", xcwm_window_get_window_id(window));
 
   HWND hWnd = xcwm_window_get_local_data(window);
 
