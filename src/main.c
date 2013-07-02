@@ -177,7 +177,7 @@ int main(int argc, char **argv)
   if (optind < argc)
       help();
 
-  DEBUG("screen is '%s'\n", screen ? screen : "$DISPLAY");
+  DEBUG("screen is '%s'\n", screen ? screen : getenv("DISPLAY"));
 
   // ensure this thread has a message queue
   MSG msg;
