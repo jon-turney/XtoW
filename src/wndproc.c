@@ -140,7 +140,7 @@ ClientToXCoord(HWND hWnd, POINT *pt)
  * This is when the user performs any windowing operation which might change
  * it's size or position (create, move, resize, minimize, maximize, restore).
  *
- * The functionality is the inverse of winPositionWindowMultiWindow, which
+ * The functionality is the inverse of winAdjustWindowsWindow, which
  * adjusts Windows window with respect to X window.
  */
 static int
@@ -180,6 +180,80 @@ winAdjustXWindow (xcwm_window_t *window, HWND hWnd)
 
 #undef WIDTH
 #undef HEIGHT
+}
+
+/*
+ * winAdjustWindowsWindow
+ *
+ * This function adjusts the position and size of Windows window
+ * with respect to the underlying X window.  This is the inverse
+ * of winAdjustXWindow, which adjusts X window to Windows window.
+ */
+void
+winAdjustWindowsWindow(xcwm_window_t *window)
+{
+  int iX, iY, iWidth, iHeight;
+  RECT rcNew;
+  RECT rcOld;
+  RECT rcClient;
+  DWORD dwExStyle;
+  DWORD dwStyle;
+
+  /* Bail out if the Windows window handle is bad */
+  HWND hWnd = xcwm_window_get_local_data(window);
+  if (!hWnd)
+    return;
+
+  const xcwm_rect_t *bounds = xcwm_window_get_full_rect(window);
+
+  /* Get the X and Y location of the Windows window client area */
+  iX = bounds->x + GetSystemMetrics(SM_XVIRTUALSCREEN);
+  iY = bounds->y + GetSystemMetrics(SM_YVIRTUALSCREEN);
+
+  /* Get the height and width of the Windows window client area */
+  iWidth = bounds->width;
+  iHeight = bounds->height;
+
+  /* Store the origin, height, and width in a rectangle structure */
+  SetRect(&rcNew, iX, iY, iX + iWidth, iY + iHeight);
+
+  /* Get the Windows window style and extended style */
+  dwExStyle = GetWindowLongPtr(hWnd, GWL_EXSTYLE);
+  dwStyle = GetWindowLongPtr(hWnd, GWL_STYLE);
+
+  /*
+   * Calculate the required size of the Windows window rectangle,
+   * given the size of the Windows window client area.
+   */
+  AdjustWindowRectEx(&rcNew, dwStyle, FALSE, dwExStyle);
+
+  /* Get a rectangle describing the old Windows window */
+  GetWindowRect(hWnd, &rcOld);
+
+#if 0
+  /* Get a rectangle describing the Windows window client area */
+  GetClientRect(hWnd, &rcClient);
+
+  DEBUG("rcNew (%d, %d)-(%d, %d)\n", rcNew.left, rcNew.top, rcNew.right, rcNew.bottom);
+  DEBUG("rcOld (%d, %d)-(%d, %d)\n", rcOld.left, rcOld.top, rcOld.right, rcOld.bottom);
+  DEBUG("rcClient (%d, %d)-(%d, %d)\n", rcClient.left, rcClient.top, rcClient.right, rcClient.bottom);
+#endif
+
+  /* Check if the old rectangle and new rectangle are the same */
+  if (!EqualRect(&rcNew, &rcOld)) {
+    DEBUG("Need to move\n");
+    DEBUG("MoveWindow to (%ld, %ld) - %ldx%ld\n",
+          rcNew.left, rcNew.top,
+          rcNew.right - rcNew.left, rcNew.bottom - rcNew.top);
+
+    /* Change the position and dimensions of the Windows window */
+    MoveWindow(hWnd,
+               rcNew.left, rcNew.top,
+               rcNew.right - rcNew.left, rcNew.bottom - rcNew.top, TRUE);
+  }
+  else {
+    DEBUG("No need to move\n");
+  }
 }
 
 /*

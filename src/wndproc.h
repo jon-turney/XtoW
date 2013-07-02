@@ -29,6 +29,7 @@ void UpdateShape(xcwm_window_t *window);
 void UpdateIcon(xcwm_window_t *window);
 void winCreateWindowsWindow(xcwm_window_t *window);
 void winDestroyWindowsWindow(xcwm_window_t *window);
+void winAdjustWindowsWindow(xcwm_window_t *window);
 
 typedef HRESULT WINAPI (*PFNDWMENABLEBLURBEHINDWINDOW)(HWND hWnd, const DWM_BLURBEHIND *pBlurBehind);
 extern PFNDWMENABLEBLURBEHINDWINDOW pDwmEnableBlurBehindWindow;
