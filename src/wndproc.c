@@ -1019,6 +1019,14 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
       /* If we are being activated, acquire the input focus */
       if (LOWORD(wParam) != WA_INACTIVE)
 	{
+          /*
+             XXX: we also move the activated window to the top of the X window stack,
+             so it is above all others in the X window stack and thus can properly
+             receive mouse events over it.  This is a shortcut for synchronizing the
+             X and native window stacking.
+           */
+          xcwm_window_set_to_top(window);
+
           xcwm_window_set_input_focus(window);
         }
       return 0;
