@@ -121,10 +121,11 @@ static void
 help(void)
 {
   fprintf(stderr, "usage: xtow [options]\n");
-  fprintf(stderr, "--nodwm       do not use DWM, even if available\n");
   fprintf(stderr, "--blur        use glass effect to blur the image beneath transparent areas\n");
   fprintf(stderr, "--display dpy display to manage windows on\n");
   fprintf(stderr, "--help\n");
+  fprintf(stderr, "--nodwm       do not use DWM, even if available\n");
+  fprintf(stderr, "--noshm       do not use SHM, even if available\n");
   exit(0);
 }
 
@@ -139,6 +140,7 @@ int main(int argc, char **argv)
 {
   char *screen = NULL;
   int nodwm = 0;
+  int noshm = 0;
 
   while (1)
     {
@@ -149,6 +151,7 @@ int main(int argc, char **argv)
           { "help",    no_argument, 0, 'h' },
           { "blur",    no_argument, 0, 'b' },
           { "nodwm",   no_argument, 0, 'n' },
+          { "noshm",   no_argument, 0, 's' },
           {0, 0, 0, 0 },
         };
 
@@ -168,6 +171,9 @@ int main(int argc, char **argv)
           break;
         case 'n':
           nodwm = 1;
+          break;
+        case 's':
+          noshm = 1;
           break;
         case 'v':
           version();
@@ -203,8 +209,15 @@ int main(int argc, char **argv)
       pDwmEnableBlurBehindWindow = NULL;
     }
 
+  xcwm_context_flags_t flags = 0;
+  if (noshm)
+    {
+      fprintf(stderr, "Use of MIT-SHM disabled by --noshm option\n");
+      flags = XCWM_DISABLE_SHM;
+    }
+
   // create the global xcwm context
-  context = xcwm_context_open(screen);
+  context = xcwm_context_open(screen, flags);
   if (!context)
     {
       fprintf(stderr, "Could not create xcwm context\n");
