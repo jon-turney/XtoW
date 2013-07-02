@@ -1571,8 +1571,9 @@ winCreateWindowsWindow(xcwm_window_t *window)
           SetWindowLongPtr(hWnd, GWL_STYLE, (WS_POPUP | WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS) & ~WS_CAPTION & ~WS_SIZEBOX);
         }
 
-      /* place the window in front of all other non-topmost windows */
-      SetWindowPos(hWnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+      /* Raise to topmost, then down to notopmost, to put the window at the top of the Z-order without activating it */
+      SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+      SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     }
   else
     {
