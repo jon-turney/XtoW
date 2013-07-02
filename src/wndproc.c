@@ -155,11 +155,13 @@ winAdjustXWindow (xcwm_window_t *window, HWND hWnd)
   if (IsIconic(hWnd))
     {
       DEBUG("Immediately return because the window is iconized\n");
-
-      /* XXX: match WM_STATE.state to state of Windows window */
-      /* XXX: send a WM_CHANGE_STATE message ? */
-
+      xcwm_window_iconify(window);
       return 0;
+    }
+
+  if (IsWindowVisible(hWnd))
+    {
+      xcwm_window_deiconify(window);
     }
 
   /* Get size of client area */
@@ -664,11 +666,12 @@ winApplyStyle(xcwm_window_t *window)
         dance when changing the style of a window with WS_EX_LAYERED set,
         to ensure that the the windows contents are drawn in the right place...
       */
-      ShowWindow(hWnd, SW_HIDE);
+      BOOL visible = IsWindowVisible(hWnd);
+      if (visible) ShowWindow(hWnd, SW_HIDE);
       SetWindowLongPtr(hWnd, GWL_EXSTYLE, exStyle & ~WS_EX_LAYERED);
       SetWindowLongPtr(hWnd, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
       SetWindowPos(hWnd, NULL, 0, 0, 0, 0, flags);
-      ShowWindow(hWnd, SW_SHOW);
+      if (visible) ShowWindow(hWnd, SW_SHOW);
     }
   else
     {
@@ -896,6 +899,40 @@ UpdateShape(xcwm_window_t *window)
   SetWindowRgn(hWnd, hRgn, TRUE);
   /* The system now owns the region specified by the region handle and will delete
      it when it is no longer needed. */
+}
+
+/*
+ * Updates the visible state of a HWND
+*/
+void
+UpdateState(xcwm_window_t *window)
+{
+  HWND hWnd = xcwm_window_get_local_data(window);
+  if (!hWnd)
+    return;
+
+  xcwm_window_state_t state = xcwm_window_get_state(window);
+
+  switch (state)
+    {
+    case XCWM_WINDOW_STATE_NORMAL:
+      /* Display the window without activating it */
+      ShowWindow(hWnd, SW_SHOWNOACTIVATE);
+      break;
+
+    case XCWM_WINDOW_STATE_ICONIC:
+      /* Display the window minimized without activating it */
+      ShowWindow(hWnd, SW_SHOWMINNOACTIVE);
+      break;
+
+    case XCWM_WINDOW_STATE_WITHDRAWN:
+      /* Hide the window */
+      ShowWindow(hWnd, SW_HIDE);
+      break;
+
+    default:
+      break;
+    }
 }
 
 static void
@@ -1551,9 +1588,6 @@ winCreateWindowsWindow(xcwm_window_t *window)
   SetWindowLongPtr(hWnd, GWL_STYLE, WS_POPUP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS);
   SetWindowPos(hWnd, 0, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOZORDER | SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 
-  /* Adjust the X window to match the window placement we actually got... */
-  winAdjustXWindow(window, hWnd);
-
   /* Make sure it gets the proper system menu for a WS_POPUP, too */
   GetSystemMenu(hWnd, TRUE);
 
@@ -1593,9 +1627,10 @@ winCreateWindowsWindow(xcwm_window_t *window)
   UpdateIcon(window);
   UpdateStyle(window);
   UpdateShape(window);
+  UpdateState(window);
 
-  /* Display the window without activating it */
-  ShowWindow(hWnd, SW_SHOWNOACTIVATE);
+  /* Adjust the X window to match the window placement we actually got... */
+  winAdjustXWindow(window, hWnd);
 }
 
 void

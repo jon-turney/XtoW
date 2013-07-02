@@ -104,6 +104,9 @@ eventHandler(const xcwm_event_t *event)
         winAdjustWindowsWindow(window);
         break;
 
+      case XCWM_EVENT_WINDOW_STATE:
+        UpdateState(window);
+
       case XCWM_EVENT_CURSOR:
         /*
           Only the 'GUI thread' is allowed to SetCursor()
