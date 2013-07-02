@@ -378,37 +378,41 @@ UpdateImage(xcwm_window_t *window)
       const xcwm_rect_t *dmgRect = xcwm_window_get_damaged_rect(window);
       // DEBUG("damaged rect is %ldx%ld @ (%ld, %ld)\n", dmgRect->width, dmgRect->height, dmgRect->x, dmgRect->y);
 
-      if (dmgRect->width == 0 || dmgRect->height == 0) {
-        DEBUG("damaged rect has zero area, %ldx%ld\n", dmgRect->width, dmgRect->height);
-      }
-
-      xcwm_image_t *image;
-      image = xcwm_image_copy_damaged(window);
-      if (image)
+      if (dmgRect->width == 0 || dmgRect->height == 0)
         {
-          CheckForAlpha(hWnd, image);
-
-          /* Update the region asked for */
-          HDC hdcUpdate = GetDC(hWnd);
-          BitBltFromImage(image, hdcUpdate,
-                          dmgRect->x, dmgRect->y,
-                          dmgRect->width, dmgRect->height,
-                          0, 0);
-          ReleaseDC(hWnd,hdcUpdate);
-
-          // useful?
-          RECT damage;
-          damage.left = dmgRect->x;
-          damage.top = dmgRect->y;
-          damage.right = dmgRect->x + dmgRect->width;
-          damage.bottom = dmgRect->y + dmgRect->height;
-          ValidateRect(hWnd, &damage);
-
-          xcwm_image_destroy(image);
+          DEBUG("damaged rect has zero area, %ldx%ld\n", dmgRect->width, dmgRect->height);
         }
       else
         {
-          DEBUG("image_copy failed\n");
+          xcwm_image_t *image;
+          image = xcwm_image_copy_damaged(window);
+
+          if (image)
+            {
+              CheckForAlpha(hWnd, image);
+
+              /* Update the region asked for */
+              HDC hdcUpdate = GetDC(hWnd);
+              BitBltFromImage(image, hdcUpdate,
+                              dmgRect->x, dmgRect->y,
+                              dmgRect->width, dmgRect->height,
+                              0, 0);
+              ReleaseDC(hWnd,hdcUpdate);
+
+              // useful?
+              RECT damage;
+              damage.left = dmgRect->x;
+              damage.top = dmgRect->y;
+              damage.right = dmgRect->x + dmgRect->width;
+              damage.bottom = dmgRect->y + dmgRect->height;
+              ValidateRect(hWnd, &damage);
+
+              xcwm_image_destroy(image);
+            }
+          else
+            {
+              DEBUG("image_copy failed\n");
+            }
         }
     }
   else
@@ -1206,9 +1210,6 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         PAINTSTRUCT ps;
         hdcUpdate = BeginPaint(hWnd, &ps);
 
-        DEBUG("WM_PAINT XID 0x%08x, hWnd 0x%08x\n", xcwm_window_get_window_id(window), hWnd);
-        DEBUG("invalidated rect is %ldx%ld @ (%ld, %ld)\n", ps.rcPaint.right - ps.rcPaint.left, ps.rcPaint.bottom - ps.rcPaint.top, ps.rcPaint.left, ps.rcPaint.top);
-
         /* Don't do anything if the PAINTSTRUCT is bogus */
         if (ps.rcPaint.right == 0 && ps.rcPaint.bottom == 0 &&
             ps.rcPaint.left == 0 && ps.rcPaint.top == 0)
@@ -1217,6 +1218,9 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
           }
         else
           {
+            DEBUG("WM_PAINT XID 0x%08x, hWnd 0x%08x\n", xcwm_window_get_window_id(window), hWnd);
+            DEBUG("invalidated rect is %ldx%ld @ (%ld, %ld)\n", ps.rcPaint.right - ps.rcPaint.left, ps.rcPaint.bottom - ps.rcPaint.top, ps.rcPaint.left, ps.rcPaint.top);
+
             /* Ask for an image of the part of the window we need to repaint */
             xcwm_rect_t area;
             area.x = ps.rcPaint.left;
