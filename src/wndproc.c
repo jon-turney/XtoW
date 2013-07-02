@@ -1209,8 +1209,14 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
           }
         else
           {
-            /* XXX: would be more efficient if we could just ask for the part we need */
-            xcwm_image_t *image = xcwm_image_copy_full(window);
+            /* Ask for an image of the part of the window we need to repaint */
+            xcwm_rect_t area;
+            area.x = ps.rcPaint.left;
+            area.y = ps.rcPaint.top;
+            area.width = ps.rcPaint.right - ps.rcPaint.left;
+            area.height = ps.rcPaint.bottom - ps.rcPaint.top;
+
+            xcwm_image_t *image = xcwm_image_copy_partial(window, &area);
             if (image)
               {
                 CheckForAlpha(hWnd, image);
@@ -1219,7 +1225,7 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 BitBltFromImage(image, hdcUpdate,
                                 ps.rcPaint.left, ps.rcPaint.top,
                                 ps.rcPaint.right - ps.rcPaint.left, ps.rcPaint.bottom - ps.rcPaint.top,
-                                ps.rcPaint.left, ps.rcPaint.top);
+                                0, 0);
 
                 xcwm_image_destroy(image);
               }
