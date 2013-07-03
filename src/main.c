@@ -85,9 +85,6 @@ eventHandler(const xcwm_event_t *event)
         UpdateImage(window);
         break;
 
-      case XCWM_EVENT_WINDOW_EXPOSE: // I don't think this event could ever be needed and is a mistake
-        break;
-
       case XCWM_EVENT_WINDOW_APPEARANCE:
         UpdateStyle(window);
         break;
