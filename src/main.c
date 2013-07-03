@@ -268,8 +268,8 @@ int main(int argc, char **argv)
   // register interest in some atoms
   motif_wm_hints = xcwm_atom_register(context, "_MOTIF_WM_HINTS", XCWM_EVENT_WINDOW_APPEARANCE);
   windowState = xcwm_atom_register(context, "_NET_WM_STATE", XCWM_EVENT_WINDOW_APPEARANCE);
-  xcwm_atom_register(context, " _NET_WM_ICON", XCWM_EVENT_WINDOW_ICON);
-  xcwm_atom_register(context, " WM_HINTS", XCWM_EVENT_WINDOW_ICON);
+  xcwm_atom_register(context, "_NET_WM_ICON", XCWM_EVENT_WINDOW_ICON);
+  xcwm_atom_register(context, "WM_HINTS", XCWM_EVENT_WINDOW_ICON);
 
   // spawn the event loop thread, and set the callback function
   xcwm_event_start_loop(context, eventHandler);
