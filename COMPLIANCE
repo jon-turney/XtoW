@@ -18,12 +18,12 @@ Section 4: Client to Window Manager Communication
 	WM_CLIENT_MACHINE:		?
 
 4.1.3 Window Manager Properties:
-	WM_STATE:			?
+	WM_STATE:			supported
 	WM_ICON_SIZE:			not set
 
         No constraints on icon size exist.  icons are scaled appropriately.
 
-4.1.4 Changing Window State:		?
+4.1.4 Changing Window State:		supported
 4.1.5 Configuring the Window:		?
 4.1.6 Changing Window Attributes:	?
 4.1.7 Input Focus:			?

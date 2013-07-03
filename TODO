@@ -14,15 +14,12 @@ new features
 * interleaving of native and X windows in Z-order should work correctly
 * update WM without restarting X applications or server (for faster development :-))
 * separate window message pump thread, so we can update window during modal loops (e.g. resizing)
-* EWMH compliance may be limited, but at least it's been audited
+* ICCCM/EWMH compliance may be limited, but at least it's been audited
 * solves the problem that minimized windows are still sensitive in the non-client area of unminimized windows they overlap ('punch-through'), as minimized windows aren't still mapped on the root window
 
 features missing compared to XWin's integrated WM
 
 those that probably need libxcwm support:
-* Convert icon found in icon property to native icon for window (done)
-* SHAPE extension support (done)
-* Change the native cursor to the X cursor image when it's over an X window (done)
 * WM_DISPLAYCHANGE should use RANDR to change the display size
 * multiple native screens should be known to XINERAMA
 * the ability to ring the bell
@@ -33,36 +30,41 @@ those that just need writing:
 * 'keyhook' option, so we can catch all keypress and consider if we want to process them, rather than only
 getting the ones that the windows shell isn't using (e.g. Windows key, Menu key, Alt-Tab)
 * 3 button mouse emulation (if anyone actually needs this anymore...)
-* Set the X keyboard configuration to match the native one
+* Set the X keyboard configuration to match the native one (external layout mapping program?)
 * Synchronize the X server modifier key state with the native one at startup, and whenever an X window gains focus (as modifiers might have been latched or unlatched without us noticing)
 * Faster way of getting the bits onto the screen than GDI BitBlt() (e.g. DirectDraw)
 * -hostintitle option to add WM_CLIENT_MACHINE to window title, if not localhost
 * Override window style settings using a config file (useful?)
 * set native application id from class hint for native window grouping
 
+features that are done:
+* Convert icon found in icon property to native icon for window (done)
+* SHAPE extension support (done)
+* Change the native cursor to the X cursor image when it's over an X window (done)
+
 other stuff:
 
+TODO
+* libxcwm doesn't look at _MOTIF_WM_HINTS (maybe only hints we get from old motif applications?) (dealt with in XtoW for the moment, should be pushed into libxcwm)
+* XtoW needs to use libxcwm style conversion
+* libxcwm assumes window properties are constant while mapped; this isn't true; for every property it looks at, it should also listen for changes to that property (prototype done)
+* libxcwm doesn't really take advantage of xcb async in all places
+* Add WM_ICON_SIZE property to root window (belongs in libxcwm)
+
+DONE
 * libxcwm doesn't adopt any existing windows when it starts (done)
 * libxcwm doesn't understand about InputOnly windows (probably should just ignore them) (done)
-* libxcwm doesn't looks at _MOTIF_WM_HINTS (maybe only hints we get from old motif applications?) (dealt with in XtoW for the moment, should be pushed into libxcwm)
-* libxcwm assumes window properties are constant while mapped; this isn't true; for every property it looks at, it should also listen for changes to that property (prototype done)
-* support the _NET_WM_WINDOW_OPACITY property using layered windows on XP, even if we can't use alpha (done)
-
-* Libraryize the code which is currently copied out of the Xserver
+* Libraryize the code which is currently copied out of the Xserver (done)
 - Initially, make it a library in the xserver codebase, so we can share it?
 - XWin on MinGW is going to be around for a while, and I don't need the maintainance headache
-
-* Implement -version command line option
-
-* xcwm doesn't really take advantage of xcb async in all places
+* Implement -version command line option (done)
+* support the _NET_WM_WINDOW_OPACITY property using layered windows on XP, even if we can't use alpha (done)
 
 native compostion notes (08/11/11):
 
 - DwmEnableBlurBehindWindows()
 - UdpateLayeredWindow() - compose in a src bitmap with alpha channel; use for window position/size change as well for maximum rendering performance
 - SetLayeredWindowAttributes() - sets an alpha value for whole windows
-
-* XtoW needs to use libxcwm style conversion
 
 * Need to store bits so we can draw them for WM_PAINT without having to ask server..
 (xcwm_image_copy_full() to get the full window image, but do we need to do this on init map, or will whole window get damage?)
@@ -72,11 +74,11 @@ libXwinWMUtil
 * should contain at least:
 - [x] Icon conversion
 - [x] Cursor conversion
-- [ ] mouse event conversion
-- [ ] keyboard event conversion
-- [ ] keyboard layout mapping
+- [x] mouse event conversion
+- [x] keyboard event conversion
+- [ ] keyboard layout mapping (separate executable?)
 - [ ] taskbar interface
-- [ ] X region to HRGN conversion (appears to be not worthwhile)
+- [.] X region to HRGN conversion (appears to be not worthwhile)
 
 WM_ICON_NAME should be used for minimized windows?
 
@@ -84,3 +86,4 @@ XQueryBestCursor()
 - only the DDX gets to decide the the answer given to this
 - we'd like to tell things that GetSystemMetrics(SM_C(X|Y)CURSOR) is the best size to use
 - It's not clear that anything actually uses this, though...
+- WM_ICON_SIZE is the way for a WM to do this
