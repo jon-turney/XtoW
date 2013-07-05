@@ -27,6 +27,9 @@ supported.
 If DWM is available, use the glass effect to blur the image beneath transparent areas.
 .B \-noshm
 Do not use MIT-SHM to transfer window images from the X server, even if available.
+.TP 8
+.B \-verbose
+Output verbose debugging information.  Multiple -verbose options increase verbosity.
 
 .SH "WINDOW PROPERTIES"
 Partial conformance to ICCCM and EWMH standards.

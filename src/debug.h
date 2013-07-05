@@ -23,10 +23,12 @@
 int winError(const char *format, ...);
 
 #if 1
+int verbosity;
 int winDebug(const char *format, ...);
-#define DEBUG winDebug
+int winDebugVerbosity(int level, const char *format, ...);
+#define DEBUG(Args...) winDebugVerbosity(1, Args)
 #else
-#define DEBUG(Args...)
+#define DEBUG(Arg...)
 #endif
 
 #endif /* DEBUG_H */

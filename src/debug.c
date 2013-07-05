@@ -22,19 +22,42 @@
 
 #include "debug.h"
 
-#if 1
+int verbosity = 0;
+
+static
+int winVDebugVerbosity(int level, const char *format, va_list ap)
+{
+  int count = 0;
+  if (level <= verbosity)
+    {
+      count = fprintf(stderr, "xtow: ");
+      count += vfprintf(stderr, format, ap);
+    }
+  return count;
+}
+
+int winDebugVerbosity(int level, const char *format, ...)
+{
+  int count;
+  va_list ap;
+  va_start(ap, format);
+  count = winVDebugVerbosity(level, format, ap);
+  va_end(ap);
+  return count;
+}
+
+#define DEBUG_VERBOSITY_DEFAULT 2
+
 int
 winDebug(const char *format, ...)
 {
   int count;
   va_list ap;
   va_start(ap, format);
-  count = fprintf(stderr, "xtow: ");
-  count += vfprintf(stderr, format, ap);
+  count = winVDebugVerbosity(DEBUG_VERBOSITY_DEFAULT, format, ap);
   va_end(ap);
   return count;
 }
-#endif
 
 int
 winError(const char *format, ...)

@@ -126,6 +126,7 @@ help(void)
   fprintf(stderr, "--help\n");
   fprintf(stderr, "--nodwm       do not use DWM, even if available\n");
   fprintf(stderr, "--noshm       do not use SHM, even if available\n");
+  fprintf(stderr, "--verbose     output verbose debug logging\n");
   exit(0);
 }
 
@@ -146,12 +147,13 @@ int main(int argc, char **argv)
     {
       static struct option long_options[] =
         {
-          { "version", no_argument, 0, 'v' },
+          { "version", no_argument, 0, 'V' },
           { "display", required_argument, 0, 'd' },
           { "help",    no_argument, 0, 'h' },
           { "blur",    no_argument, 0, 'b' },
           { "nodwm",   no_argument, 0, 'n' },
           { "noshm",   no_argument, 0, 's' },
+          { "verbose", no_argument, 0, 'v' },
           {0, 0, 0, 0 },
         };
 
@@ -175,8 +177,11 @@ int main(int argc, char **argv)
         case 's':
           noshm = 1;
           break;
-        case 'v':
+        case 'V':
           version();
+          break;
+        case 'v':
+          verbosity++;
           break;
         case 'h':
         default:
@@ -215,6 +220,9 @@ int main(int argc, char **argv)
       fprintf(stderr, "Use of MIT-SHM disabled by --noshm option\n");
       flags = XCWM_DISABLE_SHM;
     }
+
+  if (verbosity > 1)
+    flags = XCWM_VERBOSE_LOG_XEVENTS;
 
   // create the global xcwm context
   context = xcwm_context_open(screen, flags);
