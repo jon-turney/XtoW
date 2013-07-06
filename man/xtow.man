@@ -16,26 +16,33 @@ from that X server into native \fIWindows\fP windows.
 \fIxtow\fP accepts the following command line switches, \fIall\fP of which are optional:
 
 .TP 8
+.B \-blur
+If DWM is available, use the glass effect to blur the image beneath transparent areas.
+.TP 8
 .B \-display [display]
 Specifies the X server display to connect to.
+.TP 8
+.B \-help
+List these options and exit.
 .TP 8
 .B \-nodwm
 Do not use DWM, even if available (Windows Vista or later).  per-pixel transparency will not be
 supported.
 .TP 8
-.B \-blur
-If DWM is available, use the glass effect to blur the image beneath transparent areas.
 .B \-noshm
 Do not use MIT-SHM to transfer window images from the X server, even if available.
 .TP 8
 .B \-verbose
 Output verbose debugging information.  Multiple -verbose options increase verbosity.
+.TP 8
+.B \-version
+Display the version number and exit.
 
 .SH "WINDOW PROPERTIES"
 Partial conformance to ICCCM and EWMH standards.
 
-The widely used but non-standard _NET_WM_WINDOW_OPACITY window property sets the transparency of
-a window, with 0 being transparent and 0xffffffff being opaque.
+The widely used but non-standard _NET_WM_WINDOW_OPACITY window property (which can be set by e.g.
+transset(1)), controls the transparency of a window, with 0 being transparent and 0xffffffff being opaque.
 
 .SH "SEE ALSO"
 XWin(1).
