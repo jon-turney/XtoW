@@ -174,7 +174,7 @@ winAdjustXWindow (xcwm_window_t *window, HWND hWnd)
   POINT p = {0,0};
   ClientToXCoord(hWnd, &p);
 
-  DEBUG("AdjustXWindow: XID 0x%08x, hWnd 0x%08x ConfigureWindow to %ldx%ld+%ld+%ld\n", xcwm_window_get_window_id(window), hWnd, w, h, p.x, p.y);
+  DEBUG("AdjustXWindow: XID 0x%08x, hWnd 0x%08x ConfigureWindow to %dx%d+%d+%d\n", xcwm_window_get_window_id(window), hWnd, (int)w, (int)h, (int)p.x, (int)p.y);
 
   xcwm_window_configure(window, p.x, p.y, w, h);
 
@@ -329,7 +329,7 @@ BitBltFromImage(xcwm_image_t *image, HDC hdcUpdate,
   //  DEBUG("image has bpp %d, depth %d\n", image->image->bpp, image->image->depth);
 
   assert(image->image->scanline_pad = 32); // DIBs are always 32 bit aligned
-  assert(((int)image->image->data % 4) == 0); // ?
+  assert(((intptr_t)image->image->data % 4) == 0); // ?
 
   // describe the bitmap format we are given
   BITMAPINFO diBmi;
@@ -353,7 +353,7 @@ BitBltFromImage(xcwm_image_t *image, HDC hdcUpdate,
   // transfer the bits from our compatible DC to the display
   if (!BitBlt(hdcUpdate, nXDest, nYDest, nWidth, nHeight, hdcMem, nXSrc, nYSrc, SRCCOPY))
     {
-      fprintf(stderr, "BitBltFromImage: BitBlt failed: 0x%08lx\n", GetLastError());
+      fprintf(stderr, "BitBltFromImage: BitBlt failed: 0x%08x\n", (int)GetLastError());
     }
 
   SelectObject(hdcMem, hStockBitmap);
@@ -470,7 +470,7 @@ atom_get(xcwm_context_t *context, const char *atomName)
 /* This structure only contains 3 elements... the Motif 2.0 structure
 contains 5... we only need the first 3... so that is all we will define */
 typedef struct MwmHints {
-  unsigned long flags, functions, decorations;
+  unsigned int flags, functions, decorations;
 } MwmHints;
 
 #define		PropMwmHintsElements	3
@@ -1043,7 +1043,7 @@ winTopLevelWindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
       /* Store the xcwm window handle and X window XID in a Windows window properties */
       xcwm_window_t *window = ((LPCREATESTRUCT)lParam)->lpCreateParams;
       SetProp(hWnd, WIN_XCWM_PROP, window);
-      SetProp(hWnd, WIN_WID_PROP, (HANDLE)xcwm_window_get_window_id(window));
+      SetProp(hWnd, WIN_WID_PROP, (HANDLE)(INT_PTR)xcwm_window_get_window_id(window));
       return 0;
     }
 
