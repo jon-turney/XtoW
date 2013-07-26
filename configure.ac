@@ -2,7 +2,7 @@ AC_PREREQ(2.61)
 AC_INIT([XtoW], m4_esyscmd([date -u +%Y%m%d | tr -d '\n']))
 
 AM_INIT_AUTOMAKE([foreign dist-bzip2])
-AM_CONFIG_HEADER([config.h])
+AC_CONFIG_HEADERS([config.h])
 AM_SILENT_RULES([yes])
 
 # Initialize libtool
