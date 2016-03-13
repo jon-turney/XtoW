@@ -400,14 +400,6 @@ UpdateImage(xcwm_window_t *window)
                               0, 0);
               ReleaseDC(hWnd,hdcUpdate);
 
-              // useful?
-              RECT damage;
-              damage.left = dmgRect->x;
-              damage.top = dmgRect->y;
-              damage.right = dmgRect->x + dmgRect->width;
-              damage.bottom = dmgRect->y + dmgRect->height;
-              ValidateRect(hWnd, &damage);
-
               xcwm_image_destroy(image);
             }
           else
