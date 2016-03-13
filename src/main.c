@@ -33,6 +33,29 @@
 #include "wndproc.h"
 #include "wincursor.h"
 
+// When mingw-w64-headers 5.0 is available, just include versionhelper.h for these
+static
+BOOL IsWindowsVersionOrGreater(WORD major, WORD minor, WORD servpack)
+{
+  OSVERSIONINFOEXW vi = {sizeof(vi),major,minor,0,0,{0},servpack,0,0,0,0};
+  return VerifyVersionInfoW(&vi, VER_MAJORVERSION|VER_MINORVERSION|VER_SERVICEPACKMAJOR,
+         VerSetConditionMask(VerSetConditionMask(VerSetConditionMask(0,
+            VER_MAJORVERSION,VER_GREATER_EQUAL),
+            VER_MINORVERSION,VER_GREATER_EQUAL),
+            VER_SERVICEPACKMAJOR, VER_GREATER_EQUAL));
+}
+
+static
+BOOL IsWindowsVistaOrGreater(void) {
+  return IsWindowsVersionOrGreater(HIBYTE(_WIN32_WINNT_VISTA), LOBYTE(_WIN32_WINNT_VISTA), 0);
+}
+
+static
+BOOL IsWindows8OrGreater(void) {
+  return IsWindowsVersionOrGreater(HIBYTE(_WIN32_WINNT_WIN8), LOBYTE(_WIN32_WINNT_WIN8), 0);
+}
+
+//
 #define WM_XCWM_CREATE  WM_USER
 #define WM_XCWM_DESTROY (WM_USER+1)
 #define WM_XCWM_CURSOR (WM_USER+2)
@@ -202,16 +225,34 @@ int main(int argc, char **argv)
   // initialize semaphore used for synchronization
   sem_init(&semaphore, 0, 0);
 
-  // Get access to DwmEnableBlurBehindWindow, if available, so we can take advantage of it
-  // on Vista and later, but still run on earlier versions of Windows
+  // The way to tell Windows that it should use the alpha channel from a GDI
+  // window in DWM desktop composition depends on the Windows version
   HMODULE hDwmApiLib = LoadLibraryEx("dwmapi.dll", NULL, 0);
-  if (hDwmApiLib)
-    pDwmEnableBlurBehindWindow = (PFNDWMENABLEBLURBEHINDWINDOW)GetProcAddress(hDwmApiLib, "DwmEnableBlurBehindWindow");
-  DEBUG("DwmEnableBlurBehindWindow %s\n", pDwmEnableBlurBehindWindow ? "found" : "not found");
+  HMODULE hUser32 = LoadLibraryEx("user32.dll", NULL, 0);
+
+  if (IsWindowsVistaOrGreater() && !IsWindows8OrGreater())
+    {
+      // Use DwmEnableBlurBehindWindow, if available, to turn on alpha channel
+      // use on Windows Vista and Windows 7
+
+      if (hDwmApiLib)
+        pDwmEnableBlurBehindWindow = (PFNDWMENABLEBLURBEHINDWINDOW)GetProcAddress(hDwmApiLib, "DwmEnableBlurBehindWindow");
+      DEBUG("DwmEnableBlurBehindWindow %s\n", pDwmEnableBlurBehindWindow ? "found" : "not found");
+    }
+  else if (IsWindows8OrGreater())
+    {
+      // Use SetWindowCompositionAttribute, if available, to turn on alpha
+      // channel use on Windows 8, 8.1, 10
+      if (hUser32)
+        pSetWindowCompositionAttribute = (PFNSETWINDOWCOMPOSITIONATTRIBUTE) GetProcAddress(hUser32, "SetWindowCompositionAttribute");
+      DEBUG("SetWindowCompositionAttribute %s\n", pSetWindowCompositionAttribute ? "found" : "not found");
+    }
+
   if (nodwm)
     {
       DEBUG("DWM disabled by --nodwm option\n");
       pDwmEnableBlurBehindWindow = NULL;
+      pSetWindowCompositionAttribute = NULL;
     }
 
   xcwm_context_flags_t flags = 0;
@@ -361,6 +402,7 @@ int main(int argc, char **argv)
   xcwm_context_close(context);
 
   FreeLibrary(hDwmApiLib);
+  FreeLibrary(hUser32);
 
   sem_destroy(&semaphore);
 }

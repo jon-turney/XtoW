@@ -54,6 +54,7 @@
 
 int blur = 0;
 PFNDWMENABLEBLURBEHINDWINDOW pDwmEnableBlurBehindWindow = NULL;
+PFNSETWINDOWCOMPOSITIONATTRIBUTE pSetWindowCompositionAttribute = NULL;
 
 /*
  * ValidateSizing - Ensures size request respects hints
@@ -293,9 +294,18 @@ static void
 CheckForAlpha(HWND hWnd, xcwm_image_t *image)
 {
   /* image has alpha and we can do something useful with it? */
-  if ((image->image->depth == 32) && pDwmEnableBlurBehindWindow)
+  /* XXX: only need to do this once per window */
+  if (image->image->depth == 32)
+  {
+    if (pSetWindowCompositionAttribute)
     {
-      /* XXX: only do this once, for each window */
+      /* This turns on DWM looking at the alpha-channel of this window */
+      ACCENTPOLICY policy = { ACCENT_ENABLE_BLURBEHIND, 0, 0, 0 } ;
+      WINCOMPATTR data = { WCA_ACCENT_POLICY,  &policy, sizeof(ACCENTPOLICY) };
+      pSetWindowCompositionAttribute(hWnd, &data);
+    }
+    else if(pDwmEnableBlurBehindWindow)
+    {
       HRGN dummyRegion = NULL;
 
       /* restricting the blur effect to a dummy region means the rest is unblurred */
@@ -303,7 +313,7 @@ CheckForAlpha(HWND hWnd, xcwm_image_t *image)
         dummyRegion = CreateRectRgn(-1, -1, 0, 0);
 
       DWM_BLURBEHIND bbh;
-      bbh.dwFlags = DWM_BB_ENABLE | DWM_BB_BLURREGION |DWM_BB_TRANSITIONONMAXIMIZED;
+      bbh.dwFlags = DWM_BB_ENABLE | DWM_BB_BLURREGION | DWM_BB_TRANSITIONONMAXIMIZED;
       bbh.fEnable = TRUE;
       bbh.hRgnBlur = dummyRegion;
       bbh.fTransitionOnMaximized = TRUE; /* What does this do ??? */
@@ -313,11 +323,12 @@ CheckForAlpha(HWND hWnd, xcwm_image_t *image)
       // This terribly-named function actually controls if DWM looks at the alpha channel of this window
       HRESULT rc = pDwmEnableBlurBehindWindow(hWnd, &bbh);
       if (rc != S_OK)
-        fprintf(stderr, "DwmEnableBlurBehindWindow failed: %d\n", (int) GetLastError());
+        fprintf(stderr, "DwmEnableBlurBehindWindow failed: %x, %d\n", rc, (int) GetLastError());
 
       if (dummyRegion)
         DeleteObject(dummyRegion);
     }
+  }
 }
 
 static void
@@ -650,7 +661,7 @@ winApplyStyle(xcwm_window_t *window)
   if (zstyle == HWND_NOTOPMOST)
     flags |= SWP_NOZORDER | SWP_NOOWNERZORDER;
 
-  if (!pDwmEnableBlurBehindWindow)
+  if (!pDwmEnableBlurBehindWindow && !pSetWindowCompositionAttribute)
     {
       /*
         On XP, it seems we have to do an elaborate, performance killing

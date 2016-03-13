@@ -35,6 +35,29 @@ void winAdjustWindowsWindow(xcwm_window_t *window);
 typedef HRESULT WINAPI (*PFNDWMENABLEBLURBEHINDWINDOW)(HWND hWnd, const DWM_BLURBEHIND *pBlurBehind);
 extern PFNDWMENABLEBLURBEHINDWINDOW pDwmEnableBlurBehindWindow;
 
+/* Undocumented */
+typedef struct _ACCENTPOLICY
+{
+  ULONG AccentState;
+  ULONG AccentFlags;
+  ULONG GradientColor;
+  ULONG AnimationId;
+} ACCENTPOLICY;
+
+#define ACCENT_ENABLE_BLURBEHIND 3
+
+typedef struct _WINCOMPATTR
+{
+    DWORD attribute;
+    PVOID pData;
+    ULONG dataSize;
+}  WINCOMPATTR;
+
+#define WCA_ACCENT_POLICY 19
+
+typedef HRESULT WINAPI (*PFNSETWINDOWCOMPOSITIONATTRIBUTE)(HWND, WINCOMPATTR *);
+extern PFNSETWINDOWCOMPOSITIONATTRIBUTE pSetWindowCompositionAttribute;
+
 extern int blur;
 
 #endif /* WNDPROC_H */
