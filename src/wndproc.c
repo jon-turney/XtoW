@@ -52,7 +52,7 @@
 #define WM_MOUSEHWHEEL 0x020E
 #endif
 
-int blur = 0;
+int blur = 1;
 PFNDWMENABLEBLURBEHINDWINDOW pDwmEnableBlurBehindWindow = NULL;
 PFNSETWINDOWCOMPOSITIONATTRIBUTE pSetWindowCompositionAttribute = NULL;
 

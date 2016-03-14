@@ -16,14 +16,15 @@ from that X server into native \fIWindows\fP windows.
 \fIxtow\fP accepts the following command line switches, \fIall\fP of which are optional:
 
 .TP 8
-.B \-blur
-If DWM is available, use the glass effect to blur the image beneath transparent areas.
-.TP 8
 .B \-display [display]
 Specifies the X server display to connect to.
 .TP 8
 .B \-help
 List these options and exit.
+.TP 8
+.B \-noblur
+Do not use the DWM glass effect to blur the image beneath transparent areas.
+(Windows Vista and Window 7 only)
 .TP 8
 .B \-nodwm
 Do not use DWM, even if available (Windows Vista or later).  per-pixel transparency will not be

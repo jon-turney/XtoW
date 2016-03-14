@@ -144,9 +144,9 @@ static void
 help(void)
 {
   fprintf(stderr, "usage: xtow [options]\n");
-  fprintf(stderr, "--blur        use glass effect to blur the image beneath transparent areas\n");
   fprintf(stderr, "--display dpy display to manage windows on\n");
   fprintf(stderr, "--help\n");
+  fprintf(stderr, "--noblur      do not use glass effect to blur the image beneath transparent areas\n");
   fprintf(stderr, "--nodwm       do not use DWM, even if available\n");
   fprintf(stderr, "--noshm       do not use SHM, even if available\n");
   fprintf(stderr, "--verbose     output verbose debug logging\n");
@@ -173,7 +173,7 @@ int main(int argc, char **argv)
           { "version", no_argument, 0, 'V' },
           { "display", required_argument, 0, 'd' },
           { "help",    no_argument, 0, 'h' },
-          { "blur",    no_argument, 0, 'b' },
+          { "noblur",  no_argument, 0, 'b' },
           { "nodwm",   no_argument, 0, 'n' },
           { "noshm",   no_argument, 0, 's' },
           { "verbose", no_argument, 0, 'v' },
@@ -192,7 +192,7 @@ int main(int argc, char **argv)
           screen = optarg;
           break;
         case 'b':
-          blur = 1;
+          blur = 0;
           break;
         case 'n':
           nodwm = 1;
