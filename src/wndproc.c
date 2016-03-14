@@ -731,6 +731,11 @@ UpdateIcon(xcwm_window_t *window)
     hIconSmall = NULL;
   }
 
+  /* If we still need an icon, use the default icon */
+  if (!hIcon) {
+    winSelectIcons(&hIcon, &hIconSmall);
+  }
+
   if (hIcon)
     {
       /* Set the large icon */
@@ -1568,13 +1573,6 @@ winCreateWindowsWindow(xcwm_window_t *window)
   /* save the HWND into the context */
   xcwm_window_set_local_data(window, hWnd);
 
-  /* Set default icon */
-  HICON hIcon;
-  HICON hIconSmall;
-  winSelectIcons(&hIcon, &hIconSmall);
-  if (hIcon) SendMessage (hWnd, WM_SETICON, ICON_BIG, (LPARAM) hIcon);
-  if (hIconSmall) SendMessage (hWnd, WM_SETICON, ICON_SMALL, (LPARAM) hIconSmall);
-
   /* Change style back to popup, already placed... */
   SetWindowLongPtr(hWnd, GWL_STYLE, WS_POPUP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS);
   SetWindowPos(hWnd, 0, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOZORDER | SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
@@ -1615,8 +1613,8 @@ winCreateWindowsWindow(xcwm_window_t *window)
 
   /* Apply all properties which effect the window appearance or behaviour */
   UpdateName(window);
-  UpdateIcon(window);
   UpdateStyle(window);
+  UpdateIcon(window);
   UpdateShape(window);
   UpdateState(window);
 
