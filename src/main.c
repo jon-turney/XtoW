@@ -26,6 +26,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/select.h>
 
 #include "config.h"
 #include "debug.h"
