@@ -22,7 +22,7 @@ AC_PROG_INSTALL
 AC_CHECK_TOOL(WINDRES, windres)
 
 # Checks for libraries.
-PKG_CHECK_MODULES(XCWM, xcwm)
+PKG_CHECK_MODULES(XCWM, xcwm xcb xcb-xfixes xcb-icccm xcb-image)
 
 AC_CONFIG_FILES([Makefile
                  man/Makefile
